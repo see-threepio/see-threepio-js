@@ -1,4 +1,17 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+function equal(scope, args){
+    return args.next() == args.next();
+}
+
+function reverse(scope, args){
+    return args.next().split('').reverse().join('');
+}
+
+module.exports = {
+    equal: equal,
+    reverse: reverse
+};
+},{}],2:[function(require,module,exports){
 var Lang = require('lang-js'),
     Token = Lang.Token,
     global = require('./global'),
@@ -8,42 +21,6 @@ var createNestingParser = Lang.createNestingParser,
     Token = Lang.Token,
     Scope = Lang.Scope;
 
-function isIdentifier(substring){
-    var valid = /^[$A-Z_][0-9A-Z_$]*/i,
-        possibleIdentifier = substring.match(valid);
-
-    if (possibleIdentifier && possibleIdentifier.index === 0) {
-        return possibleIdentifier[0];
-    }
-}
-
-function tokeniseIdentifier(substring){
-    // searches for valid identifiers or operators
-    //operators
-    var operators = "!=<>/&|*%-^?+\\",
-        index = 0;
-
-    while (operators.indexOf(substring.charAt(index)||null) >= 0 && ++index) {}
-
-    if (index > 0) {
-        return substring.slice(0, index);
-    }
-
-    var identifier = isIdentifier(substring);
-
-    if(identifier != null){
-        return identifier;
-    }
-}
-
-function createKeywordTokeniser(Constructor, keyword){
-    return function(substring){
-        substring = isIdentifier(substring);
-        if (substring === keyword) {
-            return new Constructor(substring, substring.length);
-        }
-    };
-}
 
 function createOpperatorTokeniser(Constructor, opperator) {
     return function(substring){
@@ -53,13 +30,40 @@ function createOpperatorTokeniser(Constructor, opperator) {
     };
 }
 
-function createOpperatorEvaluator(fn) {
-    return function(scope){
-        this.leftToken.evaluate(scope);
-        this.rightToken.evaluate(scope);
-        this.result = fn(this.leftToken.result, this.rightToken.result);
-    };
-}
+function PipeToken(){}
+PipeToken = createSpec(PipeToken, Token);
+PipeToken.prototype.name = 'PipeToken';
+PipeToken.tokenPrecedence = 1;
+PipeToken.prototype.parsePrecedence = 2;
+PipeToken.tokenise = createOpperatorTokeniser(PipeToken, '|');
+PipeToken.prototype.parse = function(tokens, position){
+    this.leftToken = tokens.splice(position-1,1)[0];
+    this.rightToken = tokens.splice(position,1)[0];
+    if(!this.leftToken){
+        throw "Invalid syntax, expected token before |";
+    }
+    if(!this.rightToken){
+        throw "Invalid syntax, expected token after |";
+    }
+};
+PipeToken.prototype.evaluate = function(scope, args) {
+    this.leftToken.evaluate(scope);
+    this.rightToken.evaluate(scope);
+
+    var leftToken = this.leftToken,
+        rightToken = this.rightToken;
+
+    if(leftToken instanceof PipeToken){
+        // concat
+        this.result = leftToken.result.slice();
+    }else{
+        this.result = [];
+
+        this.result.push(leftToken.result);
+    }
+
+    this.result.push(rightToken.result);
+};
 
 function ParenthesesCloseToken(){}
 ParenthesesCloseToken = createSpec(ParenthesesCloseToken, Token);
@@ -82,20 +86,7 @@ ParenthesesOpenToken.tokenise = function(substring) {
         return new ParenthesesOpenToken(substring.charAt(0), 1);
     }
 }
-var parenthesisParser = createNestingParser(ParenthesesCloseToken);
-ParenthesesOpenToken.prototype.parse = function(tokens, position, parse){
-    parenthesisParser.apply(this, arguments);
-
-    var previousToken = tokens[position-1];
-
-    if(!previousToken || previousToken instanceof SemicolonToken || previousToken instanceof OpperatorToken){
-        return;
-    }
-
-    tokens.splice(position-1, 1);
-
-    this.previousToken = previousToken;
-};
+ParenthesesOpenToken.prototype.parse = createNestingParser(ParenthesesCloseToken);
 ParenthesesOpenToken.prototype.evaluate = function(scope){
     for(var i = 0; i < this.childTokens.length; i++){
         this.childTokens[i].evaluate(scope);
@@ -114,325 +105,254 @@ ParenthesesOpenToken.prototype.evaluate = function(scope){
     }
 }
 
-function NumberToken(){}
-NumberToken = createSpec(NumberToken, Token);
-NumberToken.tokenPrecedence = 1;
-NumberToken.prototype.parsePrecedence = 2;
-NumberToken.prototype.name = 'NumberToken';
-NumberToken.tokenise = function(substring) {
-    var specials = {
-        "NaN": Number.NaN,
-        "-NaN": Number.NaN,
-        "Infinity": Infinity,
-        "-Infinity": -Infinity
-    };
-    for (var key in specials) {
-        if (substring.slice(0, key.length) === key) {
-            return new NumberToken(key, key.length);
-        }
+function WordToken(){}
+WordToken = createSpec(WordToken, Token);
+WordToken.tokenPrecedence = 100; // very last thing always
+WordToken.prototype.parsePrecedence = 1;
+WordToken.prototype.name = 'WordToken';
+WordToken.tokenise = function(substring) {
+    return new WordToken(substring.slice(0,1), 1);
+};
+WordToken.prototype.parse = function(tokens, position){
+    var index = 0;
+
+    while(tokens[position + index + 1] && tokens[position + index + 1].name === 'WordToken'){
+        index++
     }
 
-    var valids = "0123456789-.Eex",
-        index = 0;
-
-    while (valids.indexOf(substring.charAt(index)||null) >= 0 && ++index) {}
-
-    if (index > 0) {
-        var result = substring.slice(0, index);
-        if(isNaN(parseFloat(result))){
-            return;
-        }
-        return new NumberToken(result, index);
-    }
-
-    return;
+    this.childTokens = tokens.splice(position + 1, index);
 };
-NumberToken.prototype.evaluate = function(scope){
-    this.result = parseFloat(this.original);
-};
+WordToken.prototype.evaluate = function(scope){
+    this.result = this.original;
 
-
-function SemicolonToken(){}
-SemicolonToken = createSpec(SemicolonToken, Token);
-SemicolonToken.tokenPrecedence = 1;
-SemicolonToken.prototype.parsePrecedence = 6;
-SemicolonToken.prototype.name = 'SemicolonToken';
-SemicolonToken.tokenise = function(substring) {
-    if(substring.charAt(0) === ';'){
-        return new SemicolonToken(substring.charAt(0), 1);
-    }
-};
-SemicolonToken.prototype.parse = function(tokens, position){
-    var lastPosition = 0;
-
-    for(var i = tokens.length - 1 - position; i >=0; i--){
-        if(tokens[i] instanceof SemicolonToken){
-            lastPosition = i;
-            break;
-        }
-    }
-
-    this.childTokens = tokens.splice(lastPosition, position - lastPosition);
-};
-SemicolonToken.prototype.evaluate = function(scope){
     for(var i = 0; i < this.childTokens.length; i++){
-        this.childTokens[i].evaluate(scope);
-    }
-
-    var lastChild = this.childTokens.slice(-1)[0];
-
-    this.result = lastChild ? lastChild.result : undefined;
-};
-
-function NullToken(){}
-NullToken = createSpec(NullToken, Token);
-NullToken.prototype.name = 'NullToken';
-NullToken.tokenPrecedence = 1;
-NullToken.prototype.parsePrecedence = 2;
-NullToken.tokenise = createKeywordTokeniser(NullToken, "null");
-NullToken.prototype.parse = function(tokens, position){
-};
-NullToken.prototype.evaluate = function(scope){
-    this.result = null;
-};
-
-function TrueToken(){}
-TrueToken = createSpec(TrueToken, Token);
-TrueToken.prototype.name = 'TrueToken';
-TrueToken.tokenPrecedence = 1;
-TrueToken.prototype.parsePrecedence = 2;
-TrueToken.tokenise = createKeywordTokeniser(TrueToken, "true");
-TrueToken.prototype.parse = function(tokens, position){
-};
-TrueToken.prototype.evaluate = function(scope){
-    this.result = true;
-};
-
-function FalseToken(){}
-FalseToken = createSpec(FalseToken, Token);
-FalseToken.prototype.name = 'FalseToken';
-FalseToken.tokenPrecedence = 1;
-FalseToken.prototype.parsePrecedence = 2;
-FalseToken.tokenise = createKeywordTokeniser(FalseToken, "false");
-FalseToken.prototype.parse = function(tokens, position){
-};
-FalseToken.prototype.evaluate = function(scope){
-    this.result = false;
-};
-
-function VariableToken(){}
-VariableToken = createSpec(VariableToken, Token);
-VariableToken.tokenPrecedence = 1;
-VariableToken.prototype.parsePrecedence = 2;
-VariableToken.prototype.name = 'VariableToken';
-VariableToken.tokenise = createKeywordTokeniser(VariableToken, "var");
-VariableToken.prototype.parse = function(tokens, position){
-    this.identifierKey = tokens[position + 1].original;
-};
-VariableToken.prototype.evaluate = function(scope){
-    scope.set(this.identifierKey, undefined);
-    this.result = undefined;
-};
-
-
-function DelimiterToken(){}
-DelimiterToken = createSpec(DelimiterToken, Token);
-DelimiterToken.tokenPrecedence = 1;
-DelimiterToken.prototype.parsePrecedence = 1;
-DelimiterToken.prototype.name = 'DelimiterToken';
-DelimiterToken.tokenise = function(substring) {
-    var i = 0;
-    while(i < substring.length && substring.charAt(i).trim() === "" || substring.charAt(i) === ',') {
-        i++;
-    }
-
-    if(i){
-        return new DelimiterToken(substring.slice(0, i), i);
+        this.result+= this.childTokens[i].original;
     }
 };
-DelimiterToken.prototype.parse = function(tokens, position){
-    tokens.splice(position, 1);
-};
 
-function OpperatorToken(){}
-OpperatorToken = createSpec(OpperatorToken, Token);
-OpperatorToken.tokenPrecedence = 2;
-OpperatorToken.prototype.parsePrecedence = 3;
-OpperatorToken.prototype.name = 'OpperatorToken';
-OpperatorToken.prototype.parse = function(tokens, position){
-    this.leftToken = tokens.splice(position-1,1)[0];
-    this.rightToken = tokens.splice(position,1)[0];
-};
+function PlaceholderToken(){}
+PlaceholderToken = createSpec(PlaceholderToken, Token);
+PlaceholderToken.tokenPrecedence = 1;
+PlaceholderToken.prototype.parsePrecedence = 2;
+PlaceholderToken.prototype.name = 'PlaceholderToken';
+PlaceholderToken.regex = /^(\{.*?\})/;
+PlaceholderToken.tokenise = function(substring){
+    var match = substring.match(PlaceholderToken.regex);
 
-function AssignemntToken(){}
-AssignemntToken = createSpec(AssignemntToken, OpperatorToken);
-AssignemntToken.prototype.name = 'AssignemntToken';
-AssignemntToken.tokenise = createOpperatorTokeniser(AssignemntToken, '=');
-AssignemntToken.prototype.evaluate = function(scope){
-    this.rightToken.evaluate(scope);
-    if(!(this.leftToken instanceof IdentifierToken)){
-        throw "ReferenceError: Invalid left-hand side in assignment";
-    }
-    scope.set(this.leftToken.original, this.rightToken.result, true);
-    this.result = undefined;
-};
-
-function MultiplyToken(){}
-MultiplyToken = createSpec(MultiplyToken, OpperatorToken);
-MultiplyToken.prototype.name = 'MultiplyToken';
-MultiplyToken.tokenise = createOpperatorTokeniser(MultiplyToken, '*');
-MultiplyToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a * b;
-});
-
-function DivideToken(){}
-DivideToken = createSpec(DivideToken, OpperatorToken);
-DivideToken.prototype.name = 'DivideToken';
-DivideToken.tokenise = createOpperatorTokeniser(DivideToken, '/');
-DivideToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a / b;
-});
-
-function AddToken(){}
-AddToken = createSpec(AddToken, OpperatorToken);
-AddToken.prototype.name = 'AddToken';
-AddToken.tokenise = createOpperatorTokeniser(AddToken, '+');
-AddToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a + b;
-});
-
-function SubtractToken(){}
-SubtractToken = createSpec(SubtractToken, OpperatorToken);
-SubtractToken.prototype.name = 'SubtractToken';
-SubtractToken.tokenise = createOpperatorTokeniser(SubtractToken, '-');
-SubtractToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a - b;
-});
-
-function ModulusToken(){}
-ModulusToken = createSpec(ModulusToken, OpperatorToken);
-ModulusToken.prototype.name = 'ModulusToken';
-ModulusToken.tokenise = createOpperatorTokeniser(ModulusToken, '%');
-ModulusToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a % b;
-});
-
-function LessThanOrEqualToken(){}
-LessThanOrEqualToken = createSpec(LessThanOrEqualToken, OpperatorToken);
-LessThanOrEqualToken.prototype.name = 'LessThanOrEqualToken';
-LessThanOrEqualToken.tokenise = createOpperatorTokeniser(LessThanOrEqualToken, '<=');
-LessThanOrEqualToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a <= b;
-});
-
-function LessThanToken(){}
-LessThanToken = createSpec(LessThanToken, OpperatorToken);
-LessThanToken.prototype.name = 'LessThanToken';
-LessThanToken.tokenise = createOpperatorTokeniser(LessThanToken, '<');
-LessThanToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a < b;
-});
-
-function GreaterThanOrEqualToken(){}
-GreaterThanOrEqualToken = createSpec(GreaterThanOrEqualToken, OpperatorToken);
-GreaterThanOrEqualToken.prototype.name = 'GreaterThanOrEqualToken';
-GreaterThanOrEqualToken.tokenise = createOpperatorTokeniser(GreaterThanOrEqualToken, '>=');
-GreaterThanOrEqualToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a >= b;
-});
-
-function GreaterThanToken(){}
-GreaterThanToken = createSpec(GreaterThanToken, OpperatorToken);
-GreaterThanToken.prototype.name = 'GreaterThanToken';
-GreaterThanToken.tokenise = createOpperatorTokeniser(GreaterThanToken, '>');
-GreaterThanToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a > b;
-});
-
-function AndToken(){}
-AndToken = createSpec(AndToken, OpperatorToken);
-AndToken.prototype.name = 'AndToken';
-AndToken.tokenise = createOpperatorTokeniser(AndToken, '&&');
-AndToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a && b;
-});
-
-function IdentifierToken(){}
-IdentifierToken = createSpec(IdentifierToken, Token);
-IdentifierToken.tokenPrecedence = 3;
-IdentifierToken.prototype.parsePrecedence = 2;
-IdentifierToken.prototype.name = 'IdentifierToken';
-IdentifierToken.tokenise = function(substring){
-    var result = tokeniseIdentifier(substring);
-
-    if(result != null){
-        return new IdentifierToken(result, result.length);
+    if(match){
+        var token = new PlaceholderToken(match[1], match[1].length);
+        token.key = token.original.slice(1,-1);
+        return token;
     }
 };
-IdentifierToken.prototype.evaluate = function(scope){
-    var value = scope.get(this.original);
-    if(value instanceof Token){
-        this.result = value.result;
-        this.sourcePathInfo = value.sourcePathInfo;
+PlaceholderToken.prototype.evaluate = function(scope){
+    var result = scope.get(this.original.slice(1,-1));
+    if(result instanceof Term){
+        result = '';
+    }
+    this.result = result;
+};
+
+function EvaluateToken(){}
+EvaluateToken = createSpec(EvaluateToken, Token);
+EvaluateToken.tokenPrecedence = 1;
+EvaluateToken.prototype.parsePrecedence = 11;
+EvaluateToken.prototype.name = 'EvaluateToken';
+EvaluateToken.regex = /^~(.*?)(?:\(.*?\))?(?:\s|$)/;
+EvaluateToken.tokenise = function(substring){
+    var match = substring.match(EvaluateToken.regex);
+
+    if(!match){
+        return;
+    }
+
+    var term = match[1];
+
+    var token = new EvaluateToken(match[1], match[1].length + 1);
+    token.term = term;
+
+    return token;
+};
+EvaluateToken.prototype.parse = function(tokens, position){
+    if(tokens[position+1] instanceof ParenthesesOpenToken){
+        this.argsToken = tokens.splice(position+1,1).pop();
+    }
+};
+EvaluateToken.prototype.evaluate = function(scope){
+    var term = scope.get(this.term),
+        fn,
+        args = [];
+
+    if(term instanceof Term){
+        this.result = scope.evaluateTerm(term, scope, this.args);
     }else{
-        this.result = value;
+        fn = term;
+        if(this.argsToken){
+            this.argsToken.evaluate(scope);
+        }
+        if(this.argsToken.childTokens[0] instanceof PipeToken){
+            args = this.argsToken.result;
+        }else{
+            args = [this.argsToken.result];
+        }
+        this.result = scope.callWith(fn, args);
     }
 };
 
-var tokenConverters = [
-        ParenthesesOpenToken,
-        ParenthesesCloseToken,
-        NumberToken,
-        SemicolonToken,
-        NullToken,
-        TrueToken,
-        FalseToken,
-        VariableToken,
-        DelimiterToken,
-        AssignemntToken,
-        MultiplyToken,
-        DivideToken,
-        AddToken,
-        ModulusToken,
-        LessThanOrEqualToken,
-        LessThanToken,
-        GreaterThanOrEqualToken,
-        GreaterThanToken,
-        AndToken,
-        IdentifierToken
-    ];
+function Term(key, expression){
+    var parts = key.match(/(.*?)(?:\((.*?)\))?(?:\s|$)/);
 
-var Ample = function(){
-    var ample = {},
-        lang = new Lang();
-
-    ample.lang = lang;
-    ample.tokenConverters = tokenConverters;
-    ample.global = global;
-    ample.tokenise = function(expression){
-        return ample.lang.tokenise(expression, ample.tokenConverters);
+    if(!parts){
+        throw "Invalid term definition: " + key;
     }
-    ample.evaluate = function(expression, injectedScope, returnAsTokens){
-        var scope = new Lang.Scope();
 
-        scope.add(this.global).add(injectedScope);
-
-        return lang.evaluate(expression, scope, tokenConverters, returnAsTokens);
-    };
-
-    return ample;
-};
-
-module.exports = Ample;
-},{"./global":2,"lang-js":8,"spec-js":10}],2:[function(require,module,exports){
-function floor(scope, args){
-    return Math.floor(args.next());
+    this.term = parts[1];
+    this.parameters = parts[2] ? parts[2].split('|') : [];
+    this.expression = expression;
 }
 
-module.exports = {
-    floor: floor
+var tokenConverters = [
+        ParenthesesCloseToken,
+        ParenthesesOpenToken,
+        WordToken,
+        PlaceholderToken,
+        EvaluateToken,
+        PipeToken
+    ];
+
+var SeeThreepio = function(termDefinitions){
+    var seeThreepio = {},
+        lang = new Lang(),
+        terms = {};
+
+
+    function evaluateTerm(term, scope, args){
+        for(var i = 0; i < term.parameters.length; i++){
+            var paremeter = term.parameters[i];
+
+            scope.set(paremeter, args[i]);
+        }
+
+        var tokens = lang.evaluate(term.expression, scope, tokenConverters, true);
+
+        var result = '';
+
+        for(var i = 0; i < tokens.length; i++){
+            result += tokens[i].result;
+        }
+
+        return result;
+    }
+
+    for(var key in termDefinitions){
+        var term = new Term(key, termDefinitions[key]);
+        terms[term.term] = term;
+    }
+
+    seeThreepio.lang = lang;
+    seeThreepio.tokenConverters = tokenConverters;
+    seeThreepio.global = global;
+    seeThreepio.tokenise = function(expression){
+        return seeThreepio.lang.tokenise(expression, seeThreepio.tokenConverters);
+    }
+    seeThreepio.get = function(term, args){
+        var scope = new Lang.Scope();
+
+        scope.add(this.global).add(terms);
+        scope.evaluateTerm = evaluateTerm;
+
+        var term = scope.get(term);
+
+        if(!term){
+            // ToDo, something nicer than throw
+            throw "term not defined";
+        }
+
+        return evaluateTerm(term, scope, args);
+    };
+
+    return seeThreepio;
 };
-},{}],3:[function(require,module,exports){
+
+module.exports = SeeThreepio;
+},{"./global":1,"lang-js":10,"spec-js":3}],3:[function(require,module,exports){
+Object.create = Object.create || function (o) {
+    if (arguments.length > 1) {
+        throw new Error('Object.create implementation only accepts the first parameter.');
+    }
+    function F() {}
+    F.prototype = o;
+    return new F();
+};
+
+function createSpec(child, parent){
+    var parentPrototype;
+
+    if(!parent) {
+        parent = Object;
+    }
+
+    if(!parent.prototype) {
+        parent.prototype = {};
+    }
+
+    parentPrototype = parent.prototype;
+
+    child.prototype = Object.create(parent.prototype);
+    child.prototype.__super__ = parentPrototype;
+    child.__super__ = parent;
+
+    // Yes, This is 'bad'. However, it runs once per Spec creation.
+    var spec = new Function("child", "return function " + child.name + "(){child.__super__.apply(this, arguments);return child.apply(this, arguments);}")(child);
+
+    spec.prototype = child.prototype;
+    spec.prototype.constructor = child.prototype.constructor = spec;
+    spec.__super__ = parent;
+
+    return spec;
+}
+
+module.exports = createSpec;
+},{}],4:[function(require,module,exports){
+var test = require('grape'),
+    SeeThreepio = require('../');
+
+var seeThreepio = new SeeThreepio({
+        'helloWorld': 'hello world',
+        'hello(word)': 'hello {word}',
+        'helloWorldExpression': 'hello ~world',
+        'world': 'wat',
+        'pipeTest': 'a|b|c',
+        'equalTest': '~equal(a|a)',
+        'reverseTest': '~reverse(abc)',
+        'reverseTestExpression': '~reverse(abc)'
+    });
+
+test('bare words', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('helloWorld'), 'hello world');
+});
+test('placeholders', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('hello', ['wat']), 'hello wat');
+});
+test('evaluate expression (~)', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('helloWorldExpression'), 'hello wat');
+});
+test('pipes', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pipeTest'), 'a,b,c');
+});
+test('shipped functions', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('equalTest'), 'true');
+});
+test('shipped functions 2', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('reverseTest'), 'cba');
+});
+},{"../":2,"grape":5}],5:[function(require,module,exports){
 (function (process){
 var EventEmitter = require('events').EventEmitter,
     deepEqual = require('deep-equal'),
@@ -711,7 +631,9 @@ function instantiate(){
 
         if(!grape.silent){
             console.log(results[0]);
-            process.exit(results[1]);
+            if(process && process.exit){
+                process.exit(results[1]);
+            }
         }
     }
 
@@ -760,8 +682,8 @@ function instantiate(){
 
 module.exports = instantiate();
 
-}).call(this,require("/usr/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js"))
-},{"./results":7,"/usr/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":13,"deep-equal":4,"events":12}],4:[function(require,module,exports){
+}).call(this,require("/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js"))
+},{"./results":9,"/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":13,"deep-equal":6,"events":12}],6:[function(require,module,exports){
 var pSlice = Array.prototype.slice;
 var objectKeys = require('./lib/keys.js');
 var isArguments = require('./lib/is_arguments.js');
@@ -838,7 +760,7 @@ function objEquiv(a, b, opts) {
   return true;
 }
 
-},{"./lib/is_arguments.js":5,"./lib/keys.js":6}],5:[function(require,module,exports){
+},{"./lib/is_arguments.js":7,"./lib/keys.js":8}],7:[function(require,module,exports){
 var supportsArgumentsClass = (function(){
   return Object.prototype.toString.call(arguments)
 })() == '[object Arguments]';
@@ -860,7 +782,7 @@ function unsupported(object){
     false;
 };
 
-},{}],6:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 exports = module.exports = typeof Object.keys === 'function'
   ? Object.keys : shim;
 
@@ -871,7 +793,7 @@ function shim (obj) {
   return keys;
 }
 
-},{}],7:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 
 // Taken from https://github.com/substack/tape/blob/master/lib/results.js
 
@@ -967,7 +889,7 @@ function encodeResults(results){
 }
 
 module.exports = encodeResults;
-},{}],8:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 (function (process){
 var Token = require('./token');
 
@@ -982,7 +904,8 @@ var now;
 
 if(typeof process !== 'undefined' && process.hrtime){
     now = function(){
-        return process.hrtime();
+        var time = process.hrtime();
+        return time[0] + time[1] / 1000000;
     };
 }else if(typeof performance !== 'undefined' && performance.now){
     now = function(){
@@ -999,6 +922,10 @@ if(typeof process !== 'undefined' && process.hrtime){
 }
 
 function callWith(fn, fnArguments, calledToken){
+    if(fn instanceof Token){
+        fn.evaluate(scope);
+        fn = fn.result;
+    }
     var argIndex = 0,
         scope = this,
         args = {
@@ -1061,7 +988,9 @@ function callWith(fn, fnArguments, calledToken){
 
 function Scope(oldScope){
     this.__scope__ = {};
-    this.__outerScope__ = oldScope;
+    if(oldScope){
+        this.__outerScope__ = oldScope instanceof Scope ? oldScope : {__scope__:oldScope};
+    }
 }
 Scope.prototype.get = function(key){
     var scope = this;
@@ -1107,7 +1036,7 @@ function createNestingParser(closeConstructor){
 
         while(position++, position <= tokens.length && opens){
             if(!tokens[position]){
-                throw "Invalid nesting. No closing token was found matching " + closeRegex.toString();
+                throw "Invalid nesting. No closing token was found";
             }
             if(tokens[position] instanceof openConstructor){
                 opens++;
@@ -1282,11 +1211,7 @@ function Lang(){
             lastToken;
 
         if(!(scope instanceof Scope)){
-            var injectedScope = scope;
-
-            scope = new Scope();
-
-            scope.add(injectedScope);
+            scope = new Scope(scope);
         }
 
         if(Array.isArray(expression)){
@@ -1327,8 +1252,8 @@ Lang.Scope = Scope;
 Lang.Token = Token;
 
 module.exports = Lang;
-}).call(this,require("/usr/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js"))
-},{"./token":9,"/usr/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":13}],9:[function(require,module,exports){
+}).call(this,require("/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js"))
+},{"./token":11,"/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":13}],11:[function(require,module,exports){
 function Token(substring, length){
     this.original = substring;
     this.length = length;
@@ -1340,174 +1265,7 @@ Token.prototype.valueOf = function(){
 }
 
 module.exports = Token;
-},{}],10:[function(require,module,exports){
-Object.create = Object.create || function (o) {
-    if (arguments.length > 1) {
-        throw new Error('Object.create implementation only accepts the first parameter.');
-    }
-    function F() {}
-    F.prototype = o;
-    return new F();
-};
-
-function createSpec(child, parent){
-    var parentPrototype;
-
-    if(!parent) {
-        parent = Object;
-    }
-
-    if(!parent.prototype) {
-        parent.prototype = {};
-    }
-
-    parentPrototype = parent.prototype;
-
-    child.prototype = Object.create(parent.prototype);
-    child.prototype.__super__ = parentPrototype;
-    child.__super__ = parent;
-
-    // Yes, This is 'bad'. However, it runs once per Spec creation.
-    var spec = new Function("child", "return function " + child.name + "(){child.__super__.apply(this, arguments);return child.apply(this, arguments);}")(child);
-
-    spec.prototype = child.prototype;
-    spec.prototype.constructor = child.prototype.constructor = spec;
-    spec.__super__ = parent;
-
-    return spec;
-}
-
-module.exports = createSpec;
-},{}],11:[function(require,module,exports){
-var test = require('grape'),
-    Ample = require('../');
-
-var ample = new Ample();
-
-test("1", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate("1"), 1);
-});
-test("-2", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate("-2"), -2);
-});
-test("2.4e9", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate("2.4e9"), 2400000000);
-});
-test("1.0E-3", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate("1.0E-3"), 0.001);
-});
-test("null", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate("null"), null);
-});
-test("5; 3", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate("5; 3"), 3);
-});
-test("2 * 4", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate("8"), 8);
-});
-test("2 * 4 - 2", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate("6"), 6);
-});
-test("2 * (4 - 2)", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate("4"), 4);
-});
-test("a = 5 a", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate("var a = 5; a"), 5);
-});
-test("floor(2.5)", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name), 2);
-});
-test("(floor(2.5) + 4) * 5", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name), 30);
-});
-test("var a = 5; floor(a / 2)", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name), 2);
-});
-test("var a = 5; floor(a / 2) / 2", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name), 1);
-});
-test("var a = 5; 2 * floor(a / 2)", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name), 4);
-});
-test("1(1)", function (t) {
-  t.plan(1);
-  t.throws(function(){
-    ample.evaluate(t.name);
-  });
-});
-test("1;(1)", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),1);
-});
-test("1 < 2", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),true);
-});
-test("2 < 1", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),false);
-});
-test("1 > 2", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),false);
-});
-test("2 >= 1", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),true);
-});
-test("1 <= 2", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),true);
-});
-test("2 <= 1", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),false);
-});
-test("2 <= 2", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),true);
-});
-test("1 >= 2", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),false);
-});
-test("2 >= 1", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),true);
-});
-test("2 >= 2", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),true);
-});
-test("true && 2", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),2);
-});
-test("false && 2", function (t) {
-  t.plan(1);
-  t.equal(ample.evaluate(t.name),false);
-});
-test("stats", function (t) {
-  t.plan(1);
-  ample.lang.printTopExpressions();
-  t.pass();
-});
-},{"../":1,"grape":3}],12:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -1864,4 +1622,4 @@ process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
 };
 
-},{}]},{},[11])
+},{}]},{},[4])
