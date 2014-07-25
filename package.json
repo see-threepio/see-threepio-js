@@ -1,0 +1,28 @@
+{
+  "name": "ample",
+  "version": "1.0.4",
+  "main": "ample.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "lang-js": "^2.0.0",
+    "spec-js": "~0.0.3"
+  },
+  "devDependencies": {
+    "grape": "~0.1.10"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Kory Nunn <knunn187@gmail.com>",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/KoryNunn/ample.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KoryNunn/ample/issues"
+  },
+  "homepage": "https://github.com/KoryNunn/ample"
+}
