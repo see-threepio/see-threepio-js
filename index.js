@@ -7,42 +7,6 @@ var createNestingParser = Lang.createNestingParser,
     Token = Lang.Token,
     Scope = Lang.Scope;
 
-function isIdentifier(substring){
-    var valid = /^[$A-Z_][0-9A-Z_$]*/i,
-        possibleIdentifier = substring.match(valid);
-
-    if (possibleIdentifier && possibleIdentifier.index === 0) {
-        return possibleIdentifier[0];
-    }
-}
-
-function tokeniseIdentifier(substring){
-    // searches for valid identifiers or operators
-    //operators
-    var operators = "!=<>/&|*%-^?+\\",
-        index = 0;
-
-    while (operators.indexOf(substring.charAt(index)||null) >= 0 && ++index) {}
-
-    if (index > 0) {
-        return substring.slice(0, index);
-    }
-
-    var identifier = isIdentifier(substring);
-
-    if(identifier != null){
-        return identifier;
-    }
-}
-
-function createKeywordTokeniser(Constructor, keyword){
-    return function(substring){
-        substring = isIdentifier(substring);
-        if (substring === keyword) {
-            return new Constructor(substring, substring.length);
-        }
-    };
-}
 
 function createOpperatorTokeniser(Constructor, opperator) {
     return function(substring){
@@ -52,13 +16,40 @@ function createOpperatorTokeniser(Constructor, opperator) {
     };
 }
 
-function createOpperatorEvaluator(fn) {
-    return function(scope){
-        this.leftToken.evaluate(scope);
-        this.rightToken.evaluate(scope);
-        this.result = fn(this.leftToken.result, this.rightToken.result);
-    };
-}
+function PipeToken(){}
+PipeToken = createSpec(PipeToken, Token);
+PipeToken.prototype.name = 'PipeToken';
+PipeToken.tokenPrecedence = 1;
+PipeToken.prototype.parsePrecedence = 2;
+PipeToken.tokenise = createOpperatorTokeniser(PipeToken, '|');
+PipeToken.prototype.parse = function(tokens, position){
+    this.leftToken = tokens.splice(position-1,1)[0];
+    this.rightToken = tokens.splice(position,1)[0];
+    if(!this.leftToken){
+        throw "Invalid syntax, expected token before |";
+    }
+    if(!this.rightToken){
+        throw "Invalid syntax, expected token after |";
+    }
+};
+PipeToken.prototype.evaluate = function(scope, args) {
+    this.leftToken.evaluate(scope);
+    this.rightToken.evaluate(scope);
+
+    var leftToken = this.leftToken,
+        rightToken = this.rightToken;
+
+    if(leftToken instanceof PipeToken){
+        // concat
+        this.result = leftToken.result.slice();
+    }else{
+        this.result = [];
+
+        this.result.push(leftToken.result);
+    }
+
+    this.result.push(rightToken.result);
+};
 
 function ParenthesesCloseToken(){}
 ParenthesesCloseToken = createSpec(ParenthesesCloseToken, Token);
@@ -81,20 +72,7 @@ ParenthesesOpenToken.tokenise = function(substring) {
         return new ParenthesesOpenToken(substring.charAt(0), 1);
     }
 }
-var parenthesisParser = createNestingParser(ParenthesesCloseToken);
-ParenthesesOpenToken.prototype.parse = function(tokens, position, parse){
-    parenthesisParser.apply(this, arguments);
-
-    var previousToken = tokens[position-1];
-
-    if(!previousToken || previousToken instanceof SemicolonToken || previousToken instanceof OpperatorToken){
-        return;
-    }
-
-    tokens.splice(position-1, 1);
-
-    this.previousToken = previousToken;
-};
+ParenthesesOpenToken.prototype.parse = createNestingParser(ParenthesesCloseToken);
 ParenthesesOpenToken.prototype.evaluate = function(scope){
     for(var i = 0; i < this.childTokens.length; i++){
         this.childTokens[i].evaluate(scope);
@@ -113,297 +91,149 @@ ParenthesesOpenToken.prototype.evaluate = function(scope){
     }
 }
 
-function NumberToken(){}
-NumberToken = createSpec(NumberToken, Token);
-NumberToken.tokenPrecedence = 1;
-NumberToken.prototype.parsePrecedence = 2;
-NumberToken.prototype.name = 'NumberToken';
-NumberToken.tokenise = function(substring) {
-    var specials = {
-        "NaN": Number.NaN,
-        "-NaN": Number.NaN,
-        "Infinity": Infinity,
-        "-Infinity": -Infinity
-    };
-    for (var key in specials) {
-        if (substring.slice(0, key.length) === key) {
-            return new NumberToken(key, key.length);
-        }
+function WordToken(){}
+WordToken = createSpec(WordToken, Token);
+WordToken.tokenPrecedence = 100; // very last thing always
+WordToken.prototype.parsePrecedence = 1;
+WordToken.prototype.name = 'WordToken';
+WordToken.tokenise = function(substring) {
+    return new WordToken(substring.slice(0,1), 1);
+};
+WordToken.prototype.parse = function(tokens, position){
+    var index = 0;
+
+    while(tokens[position + index + 1] && tokens[position + index + 1].name === 'WordToken'){
+        index++
     }
 
-    var valids = "0123456789-.Eex",
-        index = 0;
-
-    while (valids.indexOf(substring.charAt(index)||null) >= 0 && ++index) {}
-
-    if (index > 0) {
-        var result = substring.slice(0, index);
-        if(isNaN(parseFloat(result))){
-            return;
-        }
-        return new NumberToken(result, index);
-    }
-
-    return;
+    this.childTokens = tokens.splice(position + 1, index);
 };
-NumberToken.prototype.evaluate = function(scope){
-    this.result = parseFloat(this.original);
-};
+WordToken.prototype.evaluate = function(scope){
+    this.result = this.original;
 
-
-function SemicolonToken(){}
-SemicolonToken = createSpec(SemicolonToken, Token);
-SemicolonToken.tokenPrecedence = 1;
-SemicolonToken.prototype.parsePrecedence = 6;
-SemicolonToken.prototype.name = 'SemicolonToken';
-SemicolonToken.tokenise = function(substring) {
-    if(substring.charAt(0) === ';'){
-        return new SemicolonToken(substring.charAt(0), 1);
-    }
-};
-SemicolonToken.prototype.parse = function(tokens, position){
-    var lastPosition = 0;
-
-    for(var i = tokens.length - 1 - position; i >=0; i--){
-        if(tokens[i] instanceof SemicolonToken){
-            lastPosition = i;
-            break;
-        }
-    }
-
-    this.childTokens = tokens.splice(lastPosition, position - lastPosition);
-};
-SemicolonToken.prototype.evaluate = function(scope){
     for(var i = 0; i < this.childTokens.length; i++){
-        this.childTokens[i].evaluate(scope);
-    }
-
-    var lastChild = this.childTokens.slice(-1)[0];
-
-    this.result = lastChild ? lastChild.result : undefined;
-};
-
-function NullToken(){}
-NullToken = createSpec(NullToken, Token);
-NullToken.prototype.name = 'NullToken';
-NullToken.tokenPrecedence = 1;
-NullToken.prototype.parsePrecedence = 2;
-NullToken.tokenise = createKeywordTokeniser(NullToken, "null");
-NullToken.prototype.parse = function(tokens, position){
-};
-NullToken.prototype.evaluate = function(scope){
-    this.result = null;
-};
-
-function TrueToken(){}
-TrueToken = createSpec(TrueToken, Token);
-TrueToken.prototype.name = 'TrueToken';
-TrueToken.tokenPrecedence = 1;
-TrueToken.prototype.parsePrecedence = 2;
-TrueToken.tokenise = createKeywordTokeniser(TrueToken, "true");
-TrueToken.prototype.parse = function(tokens, position){
-};
-TrueToken.prototype.evaluate = function(scope){
-    this.result = true;
-};
-
-function FalseToken(){}
-FalseToken = createSpec(FalseToken, Token);
-FalseToken.prototype.name = 'FalseToken';
-FalseToken.tokenPrecedence = 1;
-FalseToken.prototype.parsePrecedence = 2;
-FalseToken.tokenise = createKeywordTokeniser(FalseToken, "false");
-FalseToken.prototype.parse = function(tokens, position){
-};
-FalseToken.prototype.evaluate = function(scope){
-    this.result = false;
-};
-
-function VariableToken(){}
-VariableToken = createSpec(VariableToken, Token);
-VariableToken.tokenPrecedence = 1;
-VariableToken.prototype.parsePrecedence = 2;
-VariableToken.prototype.name = 'VariableToken';
-VariableToken.tokenise = createKeywordTokeniser(VariableToken, "var");
-VariableToken.prototype.parse = function(tokens, position){
-    this.identifierKey = tokens[position + 1].original;
-};
-VariableToken.prototype.evaluate = function(scope){
-    scope.set(this.identifierKey, undefined);
-    this.result = undefined;
-};
-
-
-function DelimiterToken(){}
-DelimiterToken = createSpec(DelimiterToken, Token);
-DelimiterToken.tokenPrecedence = 1;
-DelimiterToken.prototype.parsePrecedence = 1;
-DelimiterToken.prototype.name = 'DelimiterToken';
-DelimiterToken.tokenise = function(substring) {
-    var i = 0;
-    while(i < substring.length && substring.charAt(i).trim() === "" || substring.charAt(i) === ',') {
-        i++;
-    }
-
-    if(i){
-        return new DelimiterToken(substring.slice(0, i), i);
+        this.result+= this.childTokens[i].original;
     }
 };
-DelimiterToken.prototype.parse = function(tokens, position){
-    tokens.splice(position, 1);
-};
 
-function OpperatorToken(){}
-OpperatorToken = createSpec(OpperatorToken, Token);
-OpperatorToken.tokenPrecedence = 2;
-OpperatorToken.prototype.parsePrecedence = 3;
-OpperatorToken.prototype.name = 'OpperatorToken';
-OpperatorToken.prototype.parse = function(tokens, position){
-    this.leftToken = tokens.splice(position-1,1)[0];
-    this.rightToken = tokens.splice(position,1)[0];
-};
+function PlaceholderToken(){}
+PlaceholderToken = createSpec(PlaceholderToken, Token);
+PlaceholderToken.tokenPrecedence = 1;
+PlaceholderToken.prototype.parsePrecedence = 2;
+PlaceholderToken.prototype.name = 'PlaceholderToken';
+PlaceholderToken.regex = /^(\{.*?\})/;
+PlaceholderToken.tokenise = function(substring){
+    var match = substring.match(PlaceholderToken.regex);
 
-function AssignemntToken(){}
-AssignemntToken = createSpec(AssignemntToken, OpperatorToken);
-AssignemntToken.prototype.name = 'AssignemntToken';
-AssignemntToken.tokenise = createOpperatorTokeniser(AssignemntToken, '=');
-AssignemntToken.prototype.evaluate = function(scope){
-    this.rightToken.evaluate(scope);
-    if(!(this.leftToken instanceof IdentifierToken)){
-        throw "ReferenceError: Invalid left-hand side in assignment";
-    }
-    scope.set(this.leftToken.original, this.rightToken.result, true);
-    this.result = undefined;
-};
-
-function MultiplyToken(){}
-MultiplyToken = createSpec(MultiplyToken, OpperatorToken);
-MultiplyToken.prototype.name = 'MultiplyToken';
-MultiplyToken.tokenise = createOpperatorTokeniser(MultiplyToken, '*');
-MultiplyToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a * b;
-});
-
-function DivideToken(){}
-DivideToken = createSpec(DivideToken, OpperatorToken);
-DivideToken.prototype.name = 'DivideToken';
-DivideToken.tokenise = createOpperatorTokeniser(DivideToken, '/');
-DivideToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a / b;
-});
-
-function AddToken(){}
-AddToken = createSpec(AddToken, OpperatorToken);
-AddToken.prototype.name = 'AddToken';
-AddToken.tokenise = createOpperatorTokeniser(AddToken, '+');
-AddToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a + b;
-});
-
-function SubtractToken(){}
-SubtractToken = createSpec(SubtractToken, OpperatorToken);
-SubtractToken.prototype.name = 'SubtractToken';
-SubtractToken.tokenise = createOpperatorTokeniser(SubtractToken, '-');
-SubtractToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a - b;
-});
-
-function ModulusToken(){}
-ModulusToken = createSpec(ModulusToken, OpperatorToken);
-ModulusToken.prototype.name = 'ModulusToken';
-ModulusToken.tokenise = createOpperatorTokeniser(ModulusToken, '%');
-ModulusToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a % b;
-});
-
-function LessThanOrEqualToken(){}
-LessThanOrEqualToken = createSpec(LessThanOrEqualToken, OpperatorToken);
-LessThanOrEqualToken.prototype.name = 'LessThanOrEqualToken';
-LessThanOrEqualToken.tokenise = createOpperatorTokeniser(LessThanOrEqualToken, '<=');
-LessThanOrEqualToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a <= b;
-});
-
-function LessThanToken(){}
-LessThanToken = createSpec(LessThanToken, OpperatorToken);
-LessThanToken.prototype.name = 'LessThanToken';
-LessThanToken.tokenise = createOpperatorTokeniser(LessThanToken, '<');
-LessThanToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a < b;
-});
-
-function GreaterThanOrEqualToken(){}
-GreaterThanOrEqualToken = createSpec(GreaterThanOrEqualToken, OpperatorToken);
-GreaterThanOrEqualToken.prototype.name = 'GreaterThanOrEqualToken';
-GreaterThanOrEqualToken.tokenise = createOpperatorTokeniser(GreaterThanOrEqualToken, '>=');
-GreaterThanOrEqualToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a >= b;
-});
-
-function GreaterThanToken(){}
-GreaterThanToken = createSpec(GreaterThanToken, OpperatorToken);
-GreaterThanToken.prototype.name = 'GreaterThanToken';
-GreaterThanToken.tokenise = createOpperatorTokeniser(GreaterThanToken, '>');
-GreaterThanToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a > b;
-});
-
-function AndToken(){}
-AndToken = createSpec(AndToken, OpperatorToken);
-AndToken.prototype.name = 'AndToken';
-AndToken.tokenise = createOpperatorTokeniser(AndToken, '&&');
-AndToken.prototype.evaluate = createOpperatorEvaluator(function(a,b){
-    return a && b;
-});
-
-function IdentifierToken(){}
-IdentifierToken = createSpec(IdentifierToken, Token);
-IdentifierToken.tokenPrecedence = 3;
-IdentifierToken.prototype.parsePrecedence = 2;
-IdentifierToken.prototype.name = 'IdentifierToken';
-IdentifierToken.tokenise = function(substring){
-    var result = tokeniseIdentifier(substring);
-
-    if(result != null){
-        return new IdentifierToken(result, result.length);
+    if(match){
+        var token = new PlaceholderToken(match[1], match[1].length);
+        token.key = token.original.slice(1,-1);
+        return token;
     }
 };
-IdentifierToken.prototype.evaluate = function(scope){
-    var value = scope.get(this.original);
-    if(value instanceof Token){
-        this.result = value.result;
-        this.sourcePathInfo = value.sourcePathInfo;
+PlaceholderToken.prototype.evaluate = function(scope){
+    var result = scope.get(this.original.slice(1,-1));
+    if(result instanceof Term){
+        result = '';
+    }
+    this.result = result;
+};
+
+function EvaluateToken(){}
+EvaluateToken = createSpec(EvaluateToken, Token);
+EvaluateToken.tokenPrecedence = 1;
+EvaluateToken.prototype.parsePrecedence = 11;
+EvaluateToken.prototype.name = 'EvaluateToken';
+EvaluateToken.regex = /^~(.*?)(?:\(.*?\))?(?:\s|$)/;
+EvaluateToken.tokenise = function(substring){
+    var match = substring.match(EvaluateToken.regex);
+
+    if(!match){
+        return;
+    }
+
+    var term = match[1];
+
+    var token = new EvaluateToken(match[1], match[1].length + 1);
+    token.term = term;
+
+    return token;
+};
+EvaluateToken.prototype.parse = function(tokens, position){
+    if(tokens[position+1] instanceof ParenthesesOpenToken){
+        this.argsToken = tokens.splice(position+1,1).pop();
+    }
+};
+EvaluateToken.prototype.evaluate = function(scope){
+    var term = scope.get(this.term),
+        fn,
+        args = [];
+
+    if(term instanceof Term){
+        this.result = scope.evaluateTerm(term, scope, this.args);
     }else{
-        this.result = value;
+        fn = term;
+        if(this.argsToken){
+            this.argsToken.evaluate(scope);
+        }
+        if(this.argsToken.childTokens[0] instanceof PipeToken){
+            args = this.argsToken.result;
+        }else{
+            args = [this.argsToken.result];
+        }
+        this.result = scope.callWith(fn, args);
     }
 };
+
+function Term(key, expression){
+    var parts = key.match(/(.*?)(?:\((.*?)\))?(?:\s|$)/);
+
+    if(!parts){
+        throw "Invalid term definition: " + key;
+    }
+
+    this.term = parts[1];
+    this.parameters = parts[2] ? parts[2].split('|') : [];
+    this.expression = expression;
+}
 
 var tokenConverters = [
-        ParenthesesOpenToken,
         ParenthesesCloseToken,
-        NumberToken,
-        SemicolonToken,
-        NullToken,
-        TrueToken,
-        FalseToken,
-        VariableToken,
-        DelimiterToken,
-        AssignemntToken,
-        MultiplyToken,
-        DivideToken,
-        AddToken,
-        ModulusToken,
-        LessThanOrEqualToken,
-        LessThanToken,
-        GreaterThanOrEqualToken,
-        GreaterThanToken,
-        AndToken,
-        IdentifierToken
+        ParenthesesOpenToken,
+        WordToken,
+        PlaceholderToken,
+        EvaluateToken,
+        PipeToken
     ];
 
-var SeeThreepio = function(){
+var SeeThreepio = function(termDefinitions){
     var seeThreepio = {},
-        lang = new Lang();
+        lang = new Lang(),
+        terms = {};
+
+
+    function evaluateTerm(term, scope, args){
+        for(var i = 0; i < term.parameters.length; i++){
+            var paremeter = term.parameters[i];
+
+            scope.set(paremeter, args[i]);
+        }
+
+        var tokens = lang.evaluate(term.expression, scope, tokenConverters, true);
+
+        var result = '';
+
+        for(var i = 0; i < tokens.length; i++){
+            result += tokens[i].result;
+        }
+
+        return result;
+    }
+
+    for(var key in termDefinitions){
+        var term = new Term(key, termDefinitions[key]);
+        terms[term.term] = term;
+    }
 
     seeThreepio.lang = lang;
     seeThreepio.tokenConverters = tokenConverters;
@@ -411,12 +241,20 @@ var SeeThreepio = function(){
     seeThreepio.tokenise = function(expression){
         return seeThreepio.lang.tokenise(expression, seeThreepio.tokenConverters);
     }
-    seeThreepio.evaluate = function(expression, injectedScope, returnAsTokens){
+    seeThreepio.get = function(term, args){
         var scope = new Lang.Scope();
 
-        scope.add(this.global).add(injectedScope);
+        scope.add(this.global).add(terms);
+        scope.evaluateTerm = evaluateTerm;
 
-        return lang.evaluate(expression, scope, tokenConverters, returnAsTokens);
+        var term = scope.get(term);
+
+        if(!term){
+            // ToDo, something nicer than throw
+            throw "term not defined";
+        }
+
+        return evaluateTerm(term, scope, args);
     };
 
     return seeThreepio;

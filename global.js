@@ -1,12 +1,12 @@
-function floor(scope, args){
-    return Math.floor(args.next());
+function equal(scope, args){
+    return args.next() == args.next();
 }
 
-function random(scope, args){
-    return Math.random();
+function reverse(scope, args){
+    return args.next().split('').reverse().join('');
 }
 
 module.exports = {
-    floor: floor,
-    random: random
+    equal: equal,
+    reverse: reverse
 };
