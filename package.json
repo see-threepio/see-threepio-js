@@ -1,7 +1,7 @@
 {
-  "name": "ample",
-  "version": "1.0.4",
-  "main": "ample.js",
+  "name": "see-threepio",
+  "version": "1.0.0",
+  "main": "index.js",
   "directories": {
     "test": "test"
   },
@@ -15,16 +15,16 @@
     "swig": "^1.4.1"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test"
   },
   "author": "Kory Nunn <knunn187@gmail.com>",
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git://github.com/KoryNunn/ample.git"
+    "url": "https://github.com/see-threepio/see-threepio-js"
   },
   "bugs": {
-    "url": "https://github.com/KoryNunn/ample/issues"
+    "url": "https://github.com/see-threepio/see-threepio-js/issues"
   },
-  "homepage": "https://github.com/KoryNunn/ample"
+  "homepage": "http://see-threepio.github.io/see-threepio-js/"
 }
