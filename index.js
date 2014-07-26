@@ -169,7 +169,7 @@ EvaluateToken = createSpec(EvaluateToken, Token);
 EvaluateToken.tokenPrecedence = 1;
 EvaluateToken.prototype.parsePrecedence = 4;
 EvaluateToken.prototype.name = 'EvaluateToken';
-EvaluateToken.regex = /^~(.*?)(?:\(.*?\))?(?:\s|$)/;
+EvaluateToken.regex = /^~(.*?)(?:\(.*?\))?(?:\||\)|\s|$)/;
 EvaluateToken.tokenise = function(substring){
     var match = substring.match(EvaluateToken.regex);
 
@@ -194,24 +194,24 @@ EvaluateToken.prototype.evaluate = function(scope){
         fn,
         args = [];
 
-    if(term instanceof Term){
-        this.result = scope.evaluateTerm(term, scope, this.args);
-    }else{
-        fn = term;
-        if(this.argsToken){
-            this.argsToken.evaluate(scope);
-            if(this.argsToken.childTokens[0] instanceof PipeToken){
-                args = this.argsToken.result;
-            }else{
-                args = [this.argsToken.result];
-            }
+    if(this.argsToken){
+        this.argsToken.evaluate(scope);
+        if(this.argsToken.childTokens[0] instanceof PipeToken){
+            args = this.argsToken.result;
+        }else{
+            args = [this.argsToken.result];
         }
-        this.result = scope.callWith(fn, args);
+    }
+
+    if(term instanceof Term){
+        this.result = scope.evaluateTerm(term, scope, args);
+    }else{
+        this.result = scope.callWith(term, args);
     }
 };
 
 function Term(key, expression){
-    var parts = key.match(/(.*?)(?:\((.*?)\))?(?:\s|$)/);
+    var parts = key.match(/(.*?)(?:\((.*?)\))?(?:\||\)|\s|$)/);
 
     if(!parts){
         throw "Invalid term definition: " + key;

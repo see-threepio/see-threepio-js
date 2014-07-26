@@ -4,14 +4,15 @@ var test = require('grape'),
 var seeThreepio = new SeeThreepio({
         'helloWorld': 'hello world',
         'hello(word)': 'hello {word}',
-        'helloWorldExpression': 'hello ~world',
-        'world': 'wat',
+        'helloWorldExpression': 'hello ~wat',
+        'wat': 'wat',
         'pipeTest': 'a|b|c',
         'equalTest': '~equal(a|a)',
         'notEqualTest': '~not(~equal(a|a))',
         'reverseTest': '~reverse(abc)',
         'reverseTestExpression': '~reverse(abc)',
-        'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)'
+        'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)',
+        'pluralizedWat(count)': '~pluralize(~wat|{count})'
     });
 
 test('bare words', function (t) {
@@ -49,4 +50,12 @@ test('pluralize plural', function (t) {
 test('pluralize singular', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('pluralize', ['car', 1]), 'car');
+});
+test('pluralize world', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pluralizedWat', [2]), 'wats');
+});
+test('pluralize world singular', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pluralizedWat', [1]), 'wat');
 });

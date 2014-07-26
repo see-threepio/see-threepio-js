@@ -193,7 +193,7 @@ EvaluateToken = createSpec(EvaluateToken, Token);
 EvaluateToken.tokenPrecedence = 1;
 EvaluateToken.prototype.parsePrecedence = 4;
 EvaluateToken.prototype.name = 'EvaluateToken';
-EvaluateToken.regex = /^~(.*?)(?:\(.*?\))?(?:\s|$)/;
+EvaluateToken.regex = /^~(.*?)(?:\(.*?\))?(?:\||\)|\s|$)/;
 EvaluateToken.tokenise = function(substring){
     var match = substring.match(EvaluateToken.regex);
 
@@ -218,24 +218,24 @@ EvaluateToken.prototype.evaluate = function(scope){
         fn,
         args = [];
 
-    if(term instanceof Term){
-        this.result = scope.evaluateTerm(term, scope, this.args);
-    }else{
-        fn = term;
-        if(this.argsToken){
-            this.argsToken.evaluate(scope);
-            if(this.argsToken.childTokens[0] instanceof PipeToken){
-                args = this.argsToken.result;
-            }else{
-                args = [this.argsToken.result];
-            }
+    if(this.argsToken){
+        this.argsToken.evaluate(scope);
+        if(this.argsToken.childTokens[0] instanceof PipeToken){
+            args = this.argsToken.result;
+        }else{
+            args = [this.argsToken.result];
         }
-        this.result = scope.callWith(fn, args);
+    }
+
+    if(term instanceof Term){
+        this.result = scope.evaluateTerm(term, scope, args);
+    }else{
+        this.result = scope.callWith(term, args);
     }
 };
 
 function Term(key, expression){
-    var parts = key.match(/(.*?)(?:\((.*?)\))?(?:\s|$)/);
+    var parts = key.match(/(.*?)(?:\((.*?)\))?(?:\||\)|\s|$)/);
 
     if(!parts){
         throw "Invalid term definition: " + key;
@@ -1260,14 +1260,15 @@ var test = require('grape'),
 var seeThreepio = new SeeThreepio({
         'helloWorld': 'hello world',
         'hello(word)': 'hello {word}',
-        'helloWorldExpression': 'hello ~world',
-        'world': 'wat',
+        'helloWorldExpression': 'hello ~wat',
+        'wat': 'wat',
         'pipeTest': 'a|b|c',
         'equalTest': '~equal(a|a)',
         'notEqualTest': '~not(~equal(a|a))',
         'reverseTest': '~reverse(abc)',
         'reverseTestExpression': '~reverse(abc)',
-        'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)'
+        'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)',
+        'pluralizedWat(count)': '~pluralize(~wat|{count})'
     });
 
 test('bare words', function (t) {
@@ -1305,6 +1306,14 @@ test('pluralize plural', function (t) {
 test('pluralize singular', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('pluralize', ['car', 1]), 'car');
+});
+test('pluralize world', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pluralizedWat', [2]), 'wats');
+});
+test('pluralize world singular', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pluralizedWat', [1]), 'wat');
 });
 },{"../":2,"grape":3}],12:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
