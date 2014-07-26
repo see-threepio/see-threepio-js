@@ -231,11 +231,19 @@ var tokenConverters = [
         PipeToken
     ];
 
+function convertTerms(termDefinitions, terms){
+    terms || (terms = {});
+    for(var key in termDefinitions){
+        var term = new Term(key, termDefinitions[key]);
+        terms[term.term] = term;
+    }
+    return terms;
+}
+
 var SeeThreepio = function(termDefinitions){
     var seeThreepio = {},
         lang = new Lang(),
-        terms = {};
-
+        terms = convertTerms(termDefinitions);
 
     function evaluateTerm(term, scope, args){
         for(var i = 0; i < term.parameters.length; i++){
@@ -247,11 +255,6 @@ var SeeThreepio = function(termDefinitions){
         var tokens = lang.evaluate(term.expression, scope, tokenConverters, true);
 
         return '' + combinedTokensResult(tokens);
-    }
-
-    for(var key in termDefinitions){
-        var term = new Term(key, termDefinitions[key]);
-        terms[term.term] = term;
     }
 
     seeThreepio.lang = lang;
@@ -274,6 +277,12 @@ var SeeThreepio = function(termDefinitions){
         }
 
         return evaluateTerm(term, scope, args);
+    };
+    seeThreepio.addTerms = function(termDefinitions){
+        convertTerms(termDefinitions, terms);
+    };
+    seeThreepio.replaceTerms = function(termDefinitions){
+        terms = convertTerms(termDefinitions);
     };
 
     return seeThreepio;

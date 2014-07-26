@@ -10,7 +10,9 @@
     "spec-js": "0.0.3"
   },
   "devDependencies": {
-    "grape": "~0.1.10"
+    "crel": "^1.1.2",
+    "grape": "~0.1.10",
+    "swig": "^1.4.1"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
