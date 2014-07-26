@@ -7,6 +7,23 @@ var createNestingParser = Lang.createNestingParser,
     Token = Lang.Token,
     Scope = Lang.Scope;
 
+function combinedTokensResult(tokens){
+    if(tokens.length === 1){
+        return tokens[0].result;
+    }
+    return tokens.reduce(function(result, token){
+        return result += token.result;
+    },'');
+}
+
+function evaluateTokens(tokens, scope){
+    if(!tokens){
+        return;
+    }
+    tokens.forEach(function(token){
+        token.evaluate(scope);
+    })
+}
 
 function createOpperatorTokeniser(Constructor, opperator) {
     return function(substring){
@@ -20,35 +37,43 @@ function PipeToken(){}
 PipeToken = createSpec(PipeToken, Token);
 PipeToken.prototype.name = 'PipeToken';
 PipeToken.tokenPrecedence = 1;
-PipeToken.prototype.parsePrecedence = 2;
+PipeToken.prototype.parsePrecedence = 5;
 PipeToken.tokenise = createOpperatorTokeniser(PipeToken, '|');
 PipeToken.prototype.parse = function(tokens, position){
-    this.leftToken = tokens.splice(position-1,1)[0];
-    this.rightToken = tokens.splice(position,1)[0];
-    if(!this.leftToken){
+    this.leftTokens = tokens.splice(0, position);
+
+    var rightIndex = 1;
+    while(tokens[rightIndex] && !(tokens[rightIndex] instanceof PipeToken)){
+        rightIndex++;
+    }
+
+    this.rightTokens = tokens.splice(1, rightIndex - 1);
+
+    if(!this.leftTokens){
         throw "Invalid syntax, expected token before |";
     }
-    if(!this.rightToken){
+    if(!this.rightTokens){
         throw "Invalid syntax, expected token after |";
     }
 };
 PipeToken.prototype.evaluate = function(scope, args) {
-    this.leftToken.evaluate(scope);
-    this.rightToken.evaluate(scope);
+    evaluateTokens(this.leftTokens, scope);
+    evaluateTokens(this.rightTokens, scope);
 
-    var leftToken = this.leftToken,
-        rightToken = this.rightToken;
+    var leftTokens = this.leftTokens,
+        rightTokens = this.rightTokens;
 
-    if(leftToken instanceof PipeToken){
+    if(leftTokens.length === 1 && leftTokens[0] instanceof PipeToken){
         // concat
-        this.result = leftToken.result.slice();
+        this.result = leftTokens[0].result.slice();
     }else{
         this.result = [];
-
-        this.result.push(leftToken.result);
+        if(leftTokens.length){
+            this.result.push(combinedTokensResult(leftTokens));
+        }
     }
 
-    this.result.push(rightToken.result);
+    this.result.push(combinedTokensResult(rightTokens));
 };
 
 function ParenthesesCloseToken(){}
@@ -65,7 +90,7 @@ ParenthesesCloseToken.tokenise = function(substring) {
 function ParenthesesOpenToken(){}
 ParenthesesOpenToken = createSpec(ParenthesesOpenToken, Token);
 ParenthesesOpenToken.tokenPrecedence = 1;
-ParenthesesOpenToken.prototype.parsePrecedence = 2;
+ParenthesesOpenToken.prototype.parsePrecedence = 3;
 ParenthesesOpenToken.prototype.name = 'ParenthesesOpenToken'
 ParenthesesOpenToken.tokenise = function(substring) {
     if(substring.charAt(0) === '('){
@@ -142,7 +167,7 @@ PlaceholderToken.prototype.evaluate = function(scope){
 function EvaluateToken(){}
 EvaluateToken = createSpec(EvaluateToken, Token);
 EvaluateToken.tokenPrecedence = 1;
-EvaluateToken.prototype.parsePrecedence = 11;
+EvaluateToken.prototype.parsePrecedence = 4;
 EvaluateToken.prototype.name = 'EvaluateToken';
 EvaluateToken.regex = /^~(.*?)(?:\(.*?\))?(?:\s|$)/;
 EvaluateToken.tokenise = function(substring){
@@ -175,11 +200,11 @@ EvaluateToken.prototype.evaluate = function(scope){
         fn = term;
         if(this.argsToken){
             this.argsToken.evaluate(scope);
-        }
-        if(this.argsToken.childTokens[0] instanceof PipeToken){
-            args = this.argsToken.result;
-        }else{
-            args = [this.argsToken.result];
+            if(this.argsToken.childTokens[0] instanceof PipeToken){
+                args = this.argsToken.result;
+            }else{
+                args = [this.argsToken.result];
+            }
         }
         this.result = scope.callWith(fn, args);
     }
@@ -221,13 +246,7 @@ var SeeThreepio = function(termDefinitions){
 
         var tokens = lang.evaluate(term.expression, scope, tokenConverters, true);
 
-        var result = '';
-
-        for(var i = 0; i < tokens.length; i++){
-            result += tokens[i].result;
-        }
-
-        return result;
+        return '' + combinedTokensResult(tokens);
     }
 
     for(var key in termDefinitions){

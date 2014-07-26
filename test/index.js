@@ -8,8 +8,10 @@ var seeThreepio = new SeeThreepio({
         'world': 'wat',
         'pipeTest': 'a|b|c',
         'equalTest': '~equal(a|a)',
+        'notEqualTest': '~not(~equal(a|a))',
         'reverseTest': '~reverse(abc)',
-        'reverseTestExpression': '~reverse(abc)'
+        'reverseTestExpression': '~reverse(abc)',
+        'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)'
     });
 
 test('bare words', function (t) {
@@ -28,11 +30,23 @@ test('pipes', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('pipeTest'), 'a,b,c');
 });
-test('shipped functions', function (t) {
+test('equal', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('equalTest'), 'true');
 });
-test('shipped functions 2', function (t) {
+test('not', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('notEqualTest'), 'false');
+});
+test('reverse', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('reverseTest'), 'cba');
+});
+test('pluralize plural', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pluralize', ['car', 5]), 'cars');
+});
+test('pluralize singular', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pluralize', ['car', 1]), 'car');
 });
