@@ -2,18 +2,55 @@
 <html>
 <head>
     <link rel="stylesheet" type="text/css" href="example.css">
-    <script type="text/javascript" src="example.browser.js"></script>
+    <script type="text/javascript" src="build/example.js"></script>
+    <script type="text/json">
+        {
+            "en":{
+                "seeThreepio": "See-Threepio",
+                "aNewWay": "~seeThreepio is a new way to localize your ~pluralize(string|2).",
+                "ubiquetyAndPower": "It uses the ubiquety of the JSON format, and the power of a expression language to help with translation.",
+                "javascriptImplementation": "This example runs on the JavaScript implementation of ~seeThreepio(), which works both in Node, and in the browser.",
+                "minifiedAndGZipped":"Minified and gzipped, ~seeThreepio is around",
+                "fileSize(zipped|raw)":"{zipped} gzipped \\({raw} uncompressed\\)",
+
+                "pluralize(word|count)": "~if(~equal({count}|1)|{word}|{word}s)"
+            },
+            "l33t":{
+                "seeThreepio": "C3PO",
+                "aNewWay": "~seeThreepio iz 4 n3w w4y t0 l0c4l1z3 J00r ~pluralize(5tr1n9|2).",
+                "ubiquetyAndPower": "It u53z the ub1qu3ty 0f t3h JSON f0rm4t, & t3h p0wz 0f 4 3xpr3ss10n l4ngu4g3 to h3lp w1th tr4n5l4t10n.",
+                "javascriptImplementation": "Th15 3x4mpl3 runz 0n t3h ECMAzzz 1mpl3m3nt4t10n 0f ~seeThreepio(), wh1ch w0rks b0th 1n N0d3, & 1n t3h pr0n-f1nd3r.",
+                "minifiedAndGZipped":"M1n+gz1p'd, ~seeThreepio 1z l13k",
+                "fileSize(zipped|raw)":"{zipped} z1pd \\({raw} r4w\\)",
+
+                "pluralize(word|count)": "~if(~equal({count}|1)|{word}|{word}z)"
+            },
+            "doland":{
+                "seeThreepio": "zeepytro plz",
+                "aNewWay": "~seeThreepio r gon locise ~pluralize(ward|2).",
+                "ubiquetyAndPower": "~seeThreepio yoos JSON n got pawa frem spreshuns",
+                "javascriptImplementation": "Dis won yoos ~seeThreepio() javsreps. It r werks ebrwar",
+                "minifiedAndGZipped":"iz litdl",
+                "fileSize(zipped|raw)":"{zipped} sqweshd \\({raw} nat sqweshd\\)",
+
+                "pluralize(word|count)": "~if(~equal({count}|1)|{word}|{word}s)"
+            }
+        }
+    </script>
 </head>
 <body>
     <h1>See-Threepio.js</h1>
 <template>
 
-<h2>{{__('seeThreepio')}} is a new way to localize your {{__('pluralize','string',2)}}.</h2>
+<h2>{{__('aNewWay')}}</h2>
 <p>
-    It uses the ubiquety of the JSON format, and the power of a expression language to help with translation anything you need.
+    {{__('ubiquetyAndPower')}}
 </p>
 <p>
-    This example runs on the JavaScript implementation of {{__('seeThreepio')}}, which works both in Node, and in the browser. Minified and gzipped, {{__('seeThreepio')}} is around 15kB
+    {{__('javascriptImplementation')}}
+</p>
+<p>
+    {{__('minifiedAndGZipped')}} <strong>{{__('fileSize', '3.48KB', '9.41KB')}}</strong>
 </p>
 
 </template>
