@@ -1,20 +1,16 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({"/home/kory/dev/see-threepio-js/example.js":[function(require,module,exports){
 var SeeThreepio = require('./'),
     crel = require('crel'),
     swig  = require('swig');
 
-var englishTerms = {
-    'seeThreepio': 'See-Threepio',
-    'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)'
-};
+var languages;
 
-var seeThreepio = new SeeThreepio(englishTerms);
+var seeThreepio = new SeeThreepio();
 
 var termsBox = crel('textarea'),
     input = crel('textarea'),
-    output = crel('div');
-
-termsBox.value = JSON.stringify(englishTerms, null, '    ');
+    output = crel('div'),
+    languageSelect = crel('select');
 
 function updateOutput(){
     var result;
@@ -27,9 +23,10 @@ function updateOutput(){
             }}
         });
     }catch(e){
+        console.error(e);
         input.classList.add('invalid');
     }
-    
+
     if(result){
         input.classList.remove('invalid');
         output.innerHTML = result;
@@ -41,12 +38,31 @@ function updateTerms(){
     try{
         terms = JSON.parse(termsBox.value);
     }catch(e){
+        console.error(e);
         termsBox.classList.add('invalid');
     }
     if(terms){
         termsBox.classList.remove('invalid');
         seeThreepio.replaceTerms(terms);
     }
+}
+
+function updateLanguageSelect(){
+    languages = JSON.parse(document.querySelector('[type="text/json"]').textContent.trim());
+
+    for(var key in languages){
+        crel(languageSelect,
+            crel('option', {value: key}, key)
+        );
+    }
+
+    languageSelect.addEventListener('change', function(){
+        termsBox.value = JSON.stringify(languages[languageSelect.value], null, '    ');
+        updateTerms();
+        updateOutput();
+    });
+
+    termsBox.value = JSON.stringify(languages['en'], null, '    ');
 }
 
 termsBox.addEventListener('change', updateTerms);
@@ -57,20 +73,24 @@ window.addEventListener('load', function(){
     var template = document.getElementsByTagName('template')[0];
     input.value = template.innerHTML;
     template.parentElement.removeChild(template);
+
+    updateLanguageSelect();
+    updateTerms();
     updateOutput();
-    crel(document.body, 
-        crel('div', {'class':'inputArea'}, 
+    crel(document.body,
+        crel('div', {'class':'inputArea'},
             crel('h2', 'Terms'),
+            languageSelect,
             termsBox
         ),
-        crel('div', {'class':'inputArea'}, 
+        crel('div', {'class':'inputArea'},
             crel('h2', 'Input'),
             input
         ),
         output
     );
 });
-},{"./":3,"crel":4,"swig":8}],2:[function(require,module,exports){
+},{"./":"/home/kory/dev/see-threepio-js/index.js","crel":"/home/kory/dev/see-threepio-js/node_modules/crel/crel.js","swig":"/home/kory/dev/see-threepio-js/node_modules/swig/index.js"}],"/home/kory/dev/see-threepio-js/global.js":[function(require,module,exports){
 function equal(scope, args){
     return args.next() == args.next();
 }
@@ -93,7 +113,7 @@ module.exports = {
     'if':ifFn,
     not: not
 };
-},{}],3:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/index.js":[function(require,module,exports){
 var Lang = require('lang-js'),
     Token = Lang.Token,
     global = require('./global'),
@@ -199,16 +219,10 @@ ParenthesesOpenToken.prototype.evaluate = function(scope){
         this.childTokens[i].evaluate(scope);
     }
 
-    if(this.previousToken){
-        this.previousToken.evaluate(scope);
-
-        if(typeof this.previousToken.result !== 'function'){
-            throw this.previousToken.original + " (" + this.previousToken.result + ")" + " is not a function";
-        }
-
-        this.result = scope.callWith(this.previousToken.result, this.childTokens, this);
+    if(this.childTokens.length === 1 && this.childTokens[0] instanceof PipeToken){
+        this.result = this.childTokens[0].result;
     }else{
-        this.result = this.childTokens.slice(-1)[0].result;
+        this.result = [combinedTokensResult(this.childTokens)];
     }
 }
 
@@ -218,7 +232,17 @@ WordToken.tokenPrecedence = 100; // very last thing always
 WordToken.prototype.parsePrecedence = 1;
 WordToken.prototype.name = 'WordToken';
 WordToken.tokenise = function(substring) {
-    return new WordToken(substring.slice(0,1), 1);
+    var character = substring.slice(0,1),
+        length = 1;
+
+    if(character === '\\'){
+        if(substring.charAt(1) !== '\\'){
+            character = substring.charAt(1);
+        }
+        length++;
+    }
+
+    return new WordToken(character, length);
 };
 WordToken.prototype.parse = function(tokens, position){
     var index = 0;
@@ -242,11 +266,14 @@ PlaceholderToken = createSpec(PlaceholderToken, Token);
 PlaceholderToken.tokenPrecedence = 1;
 PlaceholderToken.prototype.parsePrecedence = 2;
 PlaceholderToken.prototype.name = 'PlaceholderToken';
-PlaceholderToken.regex = /^(\{.*?\})/;
+PlaceholderToken.regex = /^(\{.+?\})/;
 PlaceholderToken.tokenise = function(substring){
     var match = substring.match(PlaceholderToken.regex);
 
     if(match){
+        if(!match[1].match(/^\{\w+\}$/)){
+            throw "Invalid placeholder name. Placeholders may only contain word characters";
+        }
         var token = new PlaceholderToken(match[1], match[1].length);
         token.key = token.original.slice(1,-1);
         return token;
@@ -265,7 +292,7 @@ EvaluateToken = createSpec(EvaluateToken, Token);
 EvaluateToken.tokenPrecedence = 1;
 EvaluateToken.prototype.parsePrecedence = 4;
 EvaluateToken.prototype.name = 'EvaluateToken';
-EvaluateToken.regex = /^~(.*?)(?:\(.*?\))?(?:\||\)|\s|$)/;
+EvaluateToken.regex = /^~(\w+)?(?:\(|\||\)|\s|$)/;
 EvaluateToken.tokenise = function(substring){
     var match = substring.match(EvaluateToken.regex);
 
@@ -292,11 +319,7 @@ EvaluateToken.prototype.evaluate = function(scope){
 
     if(this.argsToken){
         this.argsToken.evaluate(scope);
-        if(this.argsToken.childTokens[0] instanceof PipeToken){
-            args = this.argsToken.result;
-        }else{
-            args = [this.argsToken.result];
-        }
+        args = this.argsToken.result;
     }
 
     if(term instanceof Term){
@@ -307,7 +330,7 @@ EvaluateToken.prototype.evaluate = function(scope){
 };
 
 function Term(key, expression){
-    var parts = key.match(/(.*?)(?:\((.*?)\))?(?:\||\)|\s|$)/);
+    var parts = key.match(/(\w+)(?:\((.*?)\))?(?:\||\)|\s|$)/);
 
     if(!parts){
         throw "Invalid term definition: " + key;
@@ -359,17 +382,17 @@ var SeeThreepio = function(termDefinitions){
     seeThreepio.tokenise = function(expression){
         return seeThreepio.lang.tokenise(expression, seeThreepio.tokenConverters);
     }
-    seeThreepio.get = function(term, args){
+    seeThreepio.get = function(termName, args){
         var scope = new Lang.Scope();
 
         scope.add(this.global).add(terms);
         scope.evaluateTerm = evaluateTerm;
 
-        var term = scope.get(term);
+        var term = scope.get(termName);
 
         if(!term){
             // ToDo, something nicer than throw
-            throw "term not defined";
+            throw "term not defined: " + termName;
         }
 
         return evaluateTerm(term, scope, args);
@@ -385,7 +408,7 @@ var SeeThreepio = function(termDefinitions){
 };
 
 module.exports = SeeThreepio;
-},{"./global":2,"lang-js":5,"spec-js":7}],4:[function(require,module,exports){
+},{"./global":"/home/kory/dev/see-threepio-js/global.js","lang-js":"/home/kory/dev/see-threepio-js/node_modules/lang-js/lang.js","spec-js":"/home/kory/dev/see-threepio-js/node_modules/spec-js/spec.js"}],"/home/kory/dev/see-threepio-js/node_modules/crel/crel.js":[function(require,module,exports){
 //Copyright (C) 2012 Kory Nunn
 
 //Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -517,7 +540,7 @@ module.exports = SeeThreepio;
     return crel;
 }));
 
-},{}],5:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/lang-js/lang.js":[function(require,module,exports){
 (function (process){
 var Token = require('./token');
 
@@ -880,8 +903,8 @@ Lang.Scope = Scope;
 Lang.Token = Token;
 
 module.exports = Lang;
-}).call(this,require("2ud/Ha"))
-},{"./token":6,"2ud/Ha":36}],6:[function(require,module,exports){
+}).call(this,require('_process'))
+},{"./token":"/home/kory/dev/see-threepio-js/node_modules/lang-js/token.js","_process":"/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/process/browser.js"}],"/home/kory/dev/see-threepio-js/node_modules/lang-js/token.js":[function(require,module,exports){
 function Token(substring, length){
     this.original = substring;
     this.length = length;
@@ -893,7 +916,7 @@ Token.prototype.valueOf = function(){
 }
 
 module.exports = Token;
-},{}],7:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/spec-js/spec.js":[function(require,module,exports){
 Object.create = Object.create || function (o) {
     if (arguments.length > 1) {
         throw new Error('Object.create implementation only accepts the first parameter.');
@@ -931,10 +954,10 @@ function createSpec(child, parent){
 }
 
 module.exports = createSpec;
-},{}],8:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/swig/index.js":[function(require,module,exports){
 module.exports = require('./lib/swig');
 
-},{"./lib/swig":16}],9:[function(require,module,exports){
+},{"./lib/swig":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/swig.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/dateformatter.js":[function(require,module,exports){
 var utils = require('./utils');
 
 var _months = {
@@ -1134,7 +1157,7 @@ exports.U = function (input) {
   return input.getTime() / 1000;
 };
 
-},{"./utils":33}],10:[function(require,module,exports){
+},{"./utils":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/utils.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/filters.js":[function(require,module,exports){
 var utils = require('./utils'),
   dateFormatter = require('./dateformatter');
 
@@ -1766,7 +1789,7 @@ exports.url_decode = function (input) {
   return decodeURIComponent(input);
 };
 
-},{"./dateformatter":9,"./utils":33}],11:[function(require,module,exports){
+},{"./dateformatter":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/dateformatter.js","./utils":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/utils.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/lexer.js":[function(require,module,exports){
 var utils = require('./utils');
 
 /**
@@ -2074,7 +2097,7 @@ exports.read = function (str) {
   return tokens;
 };
 
-},{"./utils":33}],12:[function(require,module,exports){
+},{"./utils":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/utils.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/loaders/filesystem.js":[function(require,module,exports){
 (function (process){
 var fs = require('fs'),
   path = require('path');
@@ -2136,8 +2159,8 @@ module.exports = function (basepath, encoding) {
   return ret;
 };
 
-}).call(this,require("2ud/Ha"))
-},{"2ud/Ha":36,"fs":34,"path":35}],13:[function(require,module,exports){
+}).call(this,require('_process'))
+},{"_process":"/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/process/browser.js","fs":"/usr/lib/node_modules/watchify/node_modules/browserify/lib/_empty.js","path":"/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/path-browserify/index.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/loaders/index.js":[function(require,module,exports){
 /**
  * @namespace TemplateLoader
  * @description Swig is able to accept custom template loaders written by you, so that your templates can come from your favorite storage medium without needing to be part of the core library.
@@ -2192,7 +2215,7 @@ module.exports = function (basepath, encoding) {
 exports.fs = require('./filesystem');
 exports.memory = require('./memory');
 
-},{"./filesystem":12,"./memory":14}],14:[function(require,module,exports){
+},{"./filesystem":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/loaders/filesystem.js","./memory":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/loaders/memory.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/loaders/memory.js":[function(require,module,exports){
 var path = require('path'),
   utils = require('../utils');
 
@@ -2257,7 +2280,7 @@ module.exports = function (mapping, basepath) {
   return ret;
 };
 
-},{"../utils":33,"path":35}],15:[function(require,module,exports){
+},{"../utils":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/utils.js","path":"/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/path-browserify/index.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/parser.js":[function(require,module,exports){
 var utils = require('./utils'),
   lexer = require('./lexer');
 
@@ -3003,7 +3026,7 @@ exports.compile = function (template, parents, options, blockName) {
   return out;
 };
 
-},{"./lexer":11,"./utils":33}],16:[function(require,module,exports){
+},{"./lexer":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/lexer.js","./utils":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/utils.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/swig.js":[function(require,module,exports){
 var utils = require('./utils'),
   _tags = require('./tags'),
   _filters = require('./filters'),
@@ -3727,7 +3750,7 @@ exports.run = defaultInstance.run;
 exports.invalidateCache = defaultInstance.invalidateCache;
 exports.loaders = loaders;
 
-},{"./dateformatter":9,"./filters":10,"./loaders":13,"./parser":15,"./tags":27,"./utils":33}],17:[function(require,module,exports){
+},{"./dateformatter":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/dateformatter.js","./filters":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/filters.js","./loaders":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/loaders/index.js","./parser":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/parser.js","./tags":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/index.js","./utils":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/utils.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/autoescape.js":[function(require,module,exports){
 var utils = require('../utils'),
   strings = ['html', 'js'];
 
@@ -3766,7 +3789,7 @@ exports.parse = function (str, line, parser, types, stack, opts) {
 };
 exports.ends = true;
 
-},{"../utils":33}],18:[function(require,module,exports){
+},{"../utils":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/utils.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/block.js":[function(require,module,exports){
 /**
  * Defines a block in a template that can be overridden by a template extending this one and/or will override the current template's parent template block of the same name.
  *
@@ -3793,7 +3816,7 @@ exports.parse = function (str, line, parser) {
 exports.ends = true;
 exports.block = true;
 
-},{}],19:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/else.js":[function(require,module,exports){
 /**
  * Used within an <code data-language="swig">{% if %}</code> tag, the code block following this tag up until <code data-language="swig">{% endif %}</code> will be rendered if the <i>if</i> statement returns false.
  *
@@ -3820,7 +3843,7 @@ exports.parse = function (str, line, parser, types, stack) {
   return (stack.length && stack[stack.length - 1].name === 'if');
 };
 
-},{}],20:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/elseif.js":[function(require,module,exports){
 var ifparser = require('./if').parse;
 
 /**
@@ -3850,7 +3873,7 @@ exports.parse = function (str, line, parser, types, stack) {
   return okay && (stack.length && stack[stack.length - 1].name === 'if');
 };
 
-},{"./if":24}],21:[function(require,module,exports){
+},{"./if":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/if.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/extends.js":[function(require,module,exports){
 /**
  * Makes the current template extend a parent template. This tag must be the first item in your template.
  *
@@ -3871,7 +3894,7 @@ exports.parse = function () {
 
 exports.ends = false;
 
-},{}],22:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/filter.js":[function(require,module,exports){
 var filters = require('../filters');
 
 /**
@@ -3941,7 +3964,7 @@ exports.parse = function (str, line, parser, types) {
 
 exports.ends = true;
 
-},{"../filters":10}],23:[function(require,module,exports){
+},{"../filters":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/filters.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/for.js":[function(require,module,exports){
 var ctx = '_ctx.',
   ctxloop = ctx + 'loop';
 
@@ -4073,7 +4096,7 @@ exports.parse = function (str, line, parser, types) {
 
 exports.ends = true;
 
-},{}],24:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/if.js":[function(require,module,exports){
 /**
  * Used to create conditional statements in templates. Accepts most JavaScript valid comparisons.
  *
@@ -4161,7 +4184,7 @@ exports.parse = function (str, line, parser, types) {
 
 exports.ends = true;
 
-},{}],25:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/import.js":[function(require,module,exports){
 var utils = require('../utils');
 
 /**
@@ -4255,7 +4278,7 @@ exports.parse = function (str, line, parser, types, stack, opts) {
 
 exports.block = true;
 
-},{"../parser":15,"../swig":16,"../utils":33}],26:[function(require,module,exports){
+},{"../parser":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/parser.js","../swig":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/swig.js","../utils":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/utils.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/include.js":[function(require,module,exports){
 var ignore = 'ignore',
   missing = 'missing',
   only = 'only';
@@ -4357,7 +4380,7 @@ exports.parse = function (str, line, parser, types, stack, opts) {
   return true;
 };
 
-},{}],27:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/index.js":[function(require,module,exports){
 exports.autoescape = require('./autoescape');
 exports.block = require('./block');
 exports["else"] = require('./else');
@@ -4375,7 +4398,7 @@ exports.raw = require('./raw');
 exports.set = require('./set');
 exports.spaceless = require('./spaceless');
 
-},{"./autoescape":17,"./block":18,"./else":19,"./elseif":20,"./extends":21,"./filter":22,"./for":23,"./if":24,"./import":25,"./include":26,"./macro":28,"./parent":29,"./raw":30,"./set":31,"./spaceless":32}],28:[function(require,module,exports){
+},{"./autoescape":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/autoescape.js","./block":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/block.js","./else":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/else.js","./elseif":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/elseif.js","./extends":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/extends.js","./filter":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/filter.js","./for":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/for.js","./if":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/if.js","./import":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/import.js","./include":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/include.js","./macro":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/macro.js","./parent":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/parent.js","./raw":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/raw.js","./set":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/set.js","./spaceless":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/spaceless.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/macro.js":[function(require,module,exports){
 /**
  * Create custom, reusable snippets within your templates.
  * Can be imported from one template to another using the <a href="#import"><code data-language="swig">{% import ... %}</code></a> tag.
@@ -4457,7 +4480,7 @@ exports.parse = function (str, line, parser, types) {
 exports.ends = true;
 exports.block = true;
 
-},{}],29:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/parent.js":[function(require,module,exports){
 /**
  * Inject the content from the parent template's block of the same name into the current block.
  *
@@ -4510,7 +4533,7 @@ exports.parse = function (str, line, parser, types, stack, opts) {
   return true;
 };
 
-},{}],30:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/raw.js":[function(require,module,exports){
 // Magic tag, hardcoded into parser
 
 /**
@@ -4535,7 +4558,7 @@ exports.parse = function (str, line, parser) {
 };
 exports.ends = true;
 
-},{}],31:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/set.js":[function(require,module,exports){
 /**
  * Set a variable for re-use in the current context. This will over-write any value already set to the context for the given <var>varname</var>.
  *
@@ -4646,7 +4669,7 @@ exports.parse = function (str, line, parser, types) {
 
 exports.block = true;
 
-},{}],32:[function(require,module,exports){
+},{}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/tags/spaceless.js":[function(require,module,exports){
 var utils = require('../utils');
 
 /**
@@ -4690,7 +4713,7 @@ exports.parse = function (str, line, parser) {
 
 exports.ends = true;
 
-},{"../utils":33}],33:[function(require,module,exports){
+},{"../utils":"/home/kory/dev/see-threepio-js/node_modules/swig/lib/utils.js"}],"/home/kory/dev/see-threepio-js/node_modules/swig/lib/utils.js":[function(require,module,exports){
 var isArray;
 
 /**
@@ -4876,10 +4899,9 @@ exports.throwError = function (message, line, file) {
   throw new Error(message + '.');
 };
 
-},{}],34:[function(require,module,exports){
+},{}],"/usr/lib/node_modules/watchify/node_modules/browserify/lib/_empty.js":[function(require,module,exports){
 
-},{}],35:[function(require,module,exports){
-(function (process){
+},{}],"/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/path-browserify/index.js":[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -5105,8 +5127,7 @@ var substr = 'ab'.substr(-1) === 'b'
     }
 ;
 
-}).call(this,require("2ud/Ha"))
-},{"2ud/Ha":36}],36:[function(require,module,exports){
+},{}],"/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/process/browser.js":[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -5171,4 +5192,4 @@ process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
 };
 
-},{}]},{},[1])
+},{}]},{},["/home/kory/dev/see-threepio-js/example.js"]);

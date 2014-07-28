@@ -1,6 +1,6 @@
 {
   "name": "see-threepio",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "index.js",
   "directories": {
     "test": "test"
@@ -15,7 +15,10 @@
     "swig": "^1.4.1"
   },
   "scripts": {
-    "test": "node test"
+    "test": "node test",
+    "build": "browserify example.js > ./build/example.js; browserify standalone.js > ./build/standalone.js",
+    "example-watch": "watchify example.js -o ./build/example.js",
+    "watch": "watchify ./test/index.js -o ./test/index.browser.js"
   },
   "author": "Kory Nunn <knunn187@gmail.com>",
   "license": "ISC",

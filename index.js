@@ -103,16 +103,10 @@ ParenthesesOpenToken.prototype.evaluate = function(scope){
         this.childTokens[i].evaluate(scope);
     }
 
-    if(this.previousToken){
-        this.previousToken.evaluate(scope);
-
-        if(typeof this.previousToken.result !== 'function'){
-            throw this.previousToken.original + " (" + this.previousToken.result + ")" + " is not a function";
-        }
-
-        this.result = scope.callWith(this.previousToken.result, this.childTokens, this);
+    if(this.childTokens.length === 1 && this.childTokens[0] instanceof PipeToken){
+        this.result = this.childTokens[0].result;
     }else{
-        this.result = this.childTokens.slice(-1)[0].result;
+        this.result = [combinedTokensResult(this.childTokens)];
     }
 }
 
@@ -122,7 +116,17 @@ WordToken.tokenPrecedence = 100; // very last thing always
 WordToken.prototype.parsePrecedence = 1;
 WordToken.prototype.name = 'WordToken';
 WordToken.tokenise = function(substring) {
-    return new WordToken(substring.slice(0,1), 1);
+    var character = substring.slice(0,1),
+        length = 1;
+
+    if(character === '\\'){
+        if(substring.charAt(1) !== '\\'){
+            character = substring.charAt(1);
+        }
+        length++;
+    }
+
+    return new WordToken(character, length);
 };
 WordToken.prototype.parse = function(tokens, position){
     var index = 0;
@@ -146,11 +150,14 @@ PlaceholderToken = createSpec(PlaceholderToken, Token);
 PlaceholderToken.tokenPrecedence = 1;
 PlaceholderToken.prototype.parsePrecedence = 2;
 PlaceholderToken.prototype.name = 'PlaceholderToken';
-PlaceholderToken.regex = /^(\{.*?\})/;
+PlaceholderToken.regex = /^(\{.+?\})/;
 PlaceholderToken.tokenise = function(substring){
     var match = substring.match(PlaceholderToken.regex);
 
     if(match){
+        if(!match[1].match(/^\{\w+\}$/)){
+            throw "Invalid placeholder name. Placeholders may only contain word characters";
+        }
         var token = new PlaceholderToken(match[1], match[1].length);
         token.key = token.original.slice(1,-1);
         return token;
@@ -169,7 +176,7 @@ EvaluateToken = createSpec(EvaluateToken, Token);
 EvaluateToken.tokenPrecedence = 1;
 EvaluateToken.prototype.parsePrecedence = 4;
 EvaluateToken.prototype.name = 'EvaluateToken';
-EvaluateToken.regex = /^~(.*?)(?:\(.*?\))?(?:\||\)|\s|$)/;
+EvaluateToken.regex = /^~(\w+)?(?:\(|\||\)|\s|$)/;
 EvaluateToken.tokenise = function(substring){
     var match = substring.match(EvaluateToken.regex);
 
@@ -196,11 +203,7 @@ EvaluateToken.prototype.evaluate = function(scope){
 
     if(this.argsToken){
         this.argsToken.evaluate(scope);
-        if(this.argsToken.childTokens[0] instanceof PipeToken){
-            args = this.argsToken.result;
-        }else{
-            args = [this.argsToken.result];
-        }
+        args = this.argsToken.result;
     }
 
     if(term instanceof Term){
@@ -211,7 +214,7 @@ EvaluateToken.prototype.evaluate = function(scope){
 };
 
 function Term(key, expression){
-    var parts = key.match(/(.*?)(?:\((.*?)\))?(?:\||\)|\s|$)/);
+    var parts = key.match(/(\w+)(?:\((.*?)\))?(?:\||\)|\s|$)/);
 
     if(!parts){
         throw "Invalid term definition: " + key;
@@ -263,17 +266,17 @@ var SeeThreepio = function(termDefinitions){
     seeThreepio.tokenise = function(expression){
         return seeThreepio.lang.tokenise(expression, seeThreepio.tokenConverters);
     }
-    seeThreepio.get = function(term, args){
+    seeThreepio.get = function(termName, args){
         var scope = new Lang.Scope();
 
         scope.add(this.global).add(terms);
         scope.evaluateTerm = evaluateTerm;
 
-        var term = scope.get(term);
+        var term = scope.get(termName);
 
         if(!term){
             // ToDo, something nicer than throw
-            throw "term not defined";
+            throw "term not defined: " + termName;
         }
 
         return evaluateTerm(term, scope, args);
