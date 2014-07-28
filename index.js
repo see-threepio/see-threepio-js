@@ -103,16 +103,10 @@ ParenthesesOpenToken.prototype.evaluate = function(scope){
         this.childTokens[i].evaluate(scope);
     }
 
-    if(this.previousToken){
-        this.previousToken.evaluate(scope);
-
-        if(typeof this.previousToken.result !== 'function'){
-            throw this.previousToken.original + " (" + this.previousToken.result + ")" + " is not a function";
-        }
-
-        this.result = scope.callWith(this.previousToken.result, this.childTokens, this);
+    if(this.childTokens.length === 1 && this.childTokens[0] instanceof PipeToken){
+        this.result = this.childTokens[0].result;
     }else{
-        this.result = this.childTokens.slice(-1)[0].result;
+        this.result = [combinedTokensResult(this.childTokens)];
     }
 }
 
@@ -122,7 +116,17 @@ WordToken.tokenPrecedence = 100; // very last thing always
 WordToken.prototype.parsePrecedence = 1;
 WordToken.prototype.name = 'WordToken';
 WordToken.tokenise = function(substring) {
-    return new WordToken(substring.slice(0,1), 1);
+    var character = substring.slice(0,1),
+        length = 1;
+
+    if(character === '\\'){
+        if(substring.charAt(1) !== '\\'){
+            character = substring.charAt(1);
+        }
+        length++;
+    }
+
+    return new WordToken(character, length);
 };
 WordToken.prototype.parse = function(tokens, position){
     var index = 0;
@@ -196,11 +200,7 @@ EvaluateToken.prototype.evaluate = function(scope){
 
     if(this.argsToken){
         this.argsToken.evaluate(scope);
-        if(this.argsToken.childTokens[0] instanceof PipeToken){
-            args = this.argsToken.result;
-        }else{
-            args = [this.argsToken.result];
-        }
+        args = this.argsToken.result;
     }
 
     if(term instanceof Term){
