@@ -127,16 +127,10 @@ ParenthesesOpenToken.prototype.evaluate = function(scope){
         this.childTokens[i].evaluate(scope);
     }
 
-    if(this.previousToken){
-        this.previousToken.evaluate(scope);
-
-        if(typeof this.previousToken.result !== 'function'){
-            throw this.previousToken.original + " (" + this.previousToken.result + ")" + " is not a function";
-        }
-
-        this.result = scope.callWith(this.previousToken.result, this.childTokens, this);
+    if(this.childTokens.length === 1 && this.childTokens[0] instanceof PipeToken){
+        this.result = this.childTokens[0].result;
     }else{
-        this.result = this.childTokens.slice(-1)[0].result;
+        this.result = [combinedTokensResult(this.childTokens)];
     }
 }
 
@@ -146,7 +140,17 @@ WordToken.tokenPrecedence = 100; // very last thing always
 WordToken.prototype.parsePrecedence = 1;
 WordToken.prototype.name = 'WordToken';
 WordToken.tokenise = function(substring) {
-    return new WordToken(substring.slice(0,1), 1);
+    var character = substring.slice(0,1),
+        length = 1;
+
+    if(character === '\\'){
+        if(substring.charAt(1) !== '\\'){
+            character = substring.charAt(1);
+        }
+        length++;
+    }
+
+    return new WordToken(character, length);
 };
 WordToken.prototype.parse = function(tokens, position){
     var index = 0;
@@ -220,11 +224,7 @@ EvaluateToken.prototype.evaluate = function(scope){
 
     if(this.argsToken){
         this.argsToken.evaluate(scope);
-        if(this.argsToken.childTokens[0] instanceof PipeToken){
-            args = this.argsToken.result;
-        }else{
-            args = [this.argsToken.result];
-        }
+        args = this.argsToken.result;
     }
 
     if(term instanceof Term){
@@ -313,7 +313,137 @@ var SeeThreepio = function(termDefinitions){
 };
 
 module.exports = SeeThreepio;
-},{"./global":1,"lang-js":8,"spec-js":10}],3:[function(require,module,exports){
+},{"./global":1,"lang-js":10,"spec-js":3}],3:[function(require,module,exports){
+Object.create = Object.create || function (o) {
+    if (arguments.length > 1) {
+        throw new Error('Object.create implementation only accepts the first parameter.');
+    }
+    function F() {}
+    F.prototype = o;
+    return new F();
+};
+
+function createSpec(child, parent){
+    var parentPrototype;
+
+    if(!parent) {
+        parent = Object;
+    }
+
+    if(!parent.prototype) {
+        parent.prototype = {};
+    }
+
+    parentPrototype = parent.prototype;
+
+    child.prototype = Object.create(parent.prototype);
+    child.prototype.__super__ = parentPrototype;
+    child.__super__ = parent;
+
+    // Yes, This is 'bad'. However, it runs once per Spec creation.
+    var spec = new Function("child", "return function " + child.name + "(){child.__super__.apply(this, arguments);return child.apply(this, arguments);}")(child);
+
+    spec.prototype = child.prototype;
+    spec.prototype.constructor = child.prototype.constructor = spec;
+    spec.__super__ = parent;
+
+    return spec;
+}
+
+module.exports = createSpec;
+},{}],4:[function(require,module,exports){
+var test = require('grape'),
+    SeeThreepio = require('../');
+
+var seeThreepio = new SeeThreepio({
+        'helloWorld': 'hello world',
+        'hello(word)': 'hello {word}',
+        'helloWorldExpression': 'hello ~wat',
+        'parenthesisWithNoArgs': '~wat()',
+        'wat': 'wat',
+        'pipeTest': 'a|b|c',
+        'equalTest': '~equal(a|a)',
+        'notEqualTest': '~not(~equal(a|a))',
+        'reverseTest': '~reverse(abc)',
+        'reverseTestExpression': '~reverse(abc)',
+        'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)',
+        'pluralizedWat(count)': '~pluralize(~wat|{count})',
+        'escapedTilde': '\\~',
+        'escapedParenthesis': '\\(hello\\)',
+        'escapedPipe': '\\|',
+        'escapedCurly': '\\{hello\\}'
+    });
+
+test('bare words', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('helloWorld'), 'hello world');
+});
+test('placeholders', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('hello', ['wat']), 'hello wat');
+});
+test('evaluate expression (~)', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('helloWorldExpression'), 'hello wat');
+});
+test('parenthesis call with no arguments', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('parenthesisWithNoArgs'), 'wat');
+});
+test('evaluate expression (~)', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('helloWorldExpression'), 'hello wat');
+});('pipes', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pipeTest'), 'a,b,c');
+});
+test('equal', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('equalTest'), 'true');
+});
+test('not', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('notEqualTest'), 'false');
+});
+test('reverse', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('reverseTest'), 'cba');
+});
+test('pluralize plural', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pluralize', ['car', 5]), 'cars');
+});
+test('pluralize singular', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pluralize', ['car', 1]), 'car');
+});
+test('pluralize world', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pluralizedWat', [2]), 'wats');
+});
+test('pluralize world singular', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pluralizedWat', [1]), 'wat');
+});
+
+
+test('Escaping: ~', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('escapedTilde'), '~');
+});
+test('Escaping: ( )', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('escapedParenthesis'), '(hello)');
+});
+test('Escaping: |', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('escapedPipe'), '|');
+});
+test('Escaping: { }', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('escapedCurly'), '{hello}');
+});
+},{"../":2,"grape":5}],5:[function(require,module,exports){
 (function (process){
 var EventEmitter = require('events').EventEmitter,
     deepEqual = require('deep-equal'),
@@ -592,7 +722,9 @@ function instantiate(){
 
         if(!grape.silent){
             console.log(results[0]);
-            process.exit(results[1]);
+            if(process && process.exit){
+                process.exit(results[1]);
+            }
         }
     }
 
@@ -641,8 +773,8 @@ function instantiate(){
 
 module.exports = instantiate();
 
-}).call(this,require("2ud/Ha"))
-},{"./results":7,"2ud/Ha":13,"deep-equal":4,"events":12}],4:[function(require,module,exports){
+}).call(this,require("/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js"))
+},{"./results":9,"/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":13,"deep-equal":6,"events":12}],6:[function(require,module,exports){
 var pSlice = Array.prototype.slice;
 var objectKeys = require('./lib/keys.js');
 var isArguments = require('./lib/is_arguments.js');
@@ -719,7 +851,7 @@ function objEquiv(a, b, opts) {
   return true;
 }
 
-},{"./lib/is_arguments.js":5,"./lib/keys.js":6}],5:[function(require,module,exports){
+},{"./lib/is_arguments.js":7,"./lib/keys.js":8}],7:[function(require,module,exports){
 var supportsArgumentsClass = (function(){
   return Object.prototype.toString.call(arguments)
 })() == '[object Arguments]';
@@ -741,7 +873,7 @@ function unsupported(object){
     false;
 };
 
-},{}],6:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 exports = module.exports = typeof Object.keys === 'function'
   ? Object.keys : shim;
 
@@ -752,7 +884,7 @@ function shim (obj) {
   return keys;
 }
 
-},{}],7:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 
 // Taken from https://github.com/substack/tape/blob/master/lib/results.js
 
@@ -848,7 +980,7 @@ function encodeResults(results){
 }
 
 module.exports = encodeResults;
-},{}],8:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 (function (process){
 var Token = require('./token');
 
@@ -1211,8 +1343,8 @@ Lang.Scope = Scope;
 Lang.Token = Token;
 
 module.exports = Lang;
-}).call(this,require("2ud/Ha"))
-},{"./token":9,"2ud/Ha":13}],9:[function(require,module,exports){
+}).call(this,require("/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js"))
+},{"./token":11,"/usr/lib/node_modules/watchify/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":13}],11:[function(require,module,exports){
 function Token(substring, length){
     this.original = substring;
     this.length = length;
@@ -1224,107 +1356,7 @@ Token.prototype.valueOf = function(){
 }
 
 module.exports = Token;
-},{}],10:[function(require,module,exports){
-Object.create = Object.create || function (o) {
-    if (arguments.length > 1) {
-        throw new Error('Object.create implementation only accepts the first parameter.');
-    }
-    function F() {}
-    F.prototype = o;
-    return new F();
-};
-
-function createSpec(child, parent){
-    var parentPrototype;
-
-    if(!parent) {
-        parent = Object;
-    }
-
-    if(!parent.prototype) {
-        parent.prototype = {};
-    }
-
-    parentPrototype = parent.prototype;
-
-    child.prototype = Object.create(parent.prototype);
-    child.prototype.__super__ = parentPrototype;
-    child.__super__ = parent;
-
-    // Yes, This is 'bad'. However, it runs once per Spec creation.
-    var spec = new Function("child", "return function " + child.name + "(){child.__super__.apply(this, arguments);return child.apply(this, arguments);}")(child);
-
-    spec.prototype = child.prototype;
-    spec.prototype.constructor = child.prototype.constructor = spec;
-    spec.__super__ = parent;
-
-    return spec;
-}
-
-module.exports = createSpec;
-},{}],11:[function(require,module,exports){
-var test = require('grape'),
-    SeeThreepio = require('../');
-
-var seeThreepio = new SeeThreepio({
-        'helloWorld': 'hello world',
-        'hello(word)': 'hello {word}',
-        'helloWorldExpression': 'hello ~wat',
-        'wat': 'wat',
-        'pipeTest': 'a|b|c',
-        'equalTest': '~equal(a|a)',
-        'notEqualTest': '~not(~equal(a|a))',
-        'reverseTest': '~reverse(abc)',
-        'reverseTestExpression': '~reverse(abc)',
-        'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)',
-        'pluralizedWat(count)': '~pluralize(~wat|{count})'
-    });
-
-test('bare words', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('helloWorld'), 'hello world');
-});
-test('placeholders', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('hello', ['wat']), 'hello wat');
-});
-test('evaluate expression (~)', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('helloWorldExpression'), 'hello wat');
-});
-test('pipes', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('pipeTest'), 'a,b,c');
-});
-test('equal', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('equalTest'), 'true');
-});
-test('not', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('notEqualTest'), 'false');
-});
-test('reverse', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('reverseTest'), 'cba');
-});
-test('pluralize plural', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('pluralize', ['car', 5]), 'cars');
-});
-test('pluralize singular', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('pluralize', ['car', 1]), 'car');
-});
-test('pluralize world', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('pluralizedWat', [2]), 'wats');
-});
-test('pluralize world singular', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('pluralizedWat', [1]), 'wat');
-});
-},{"../":2,"grape":3}],12:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -1472,10 +1504,7 @@ EventEmitter.prototype.addListener = function(type, listener) {
                     'leak detected. %d listeners added. ' +
                     'Use emitter.setMaxListeners() to increase limit.',
                     this._events[type].length);
-      if (typeof console.trace === 'function') {
-        // not supported in IE 10
-        console.trace();
-      }
+      console.trace();
     }
   }
 
@@ -1674,16 +1703,6 @@ process.browser = true;
 process.env = {};
 process.argv = [];
 
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-
 process.binding = function (name) {
     throw new Error('process.binding is not supported');
 }
@@ -1694,4 +1713,4 @@ process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
 };
 
-},{}]},{},[11])
+},{}]},{},[4])

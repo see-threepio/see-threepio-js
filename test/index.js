@@ -5,6 +5,7 @@ var seeThreepio = new SeeThreepio({
         'helloWorld': 'hello world',
         'hello(word)': 'hello {word}',
         'helloWorldExpression': 'hello ~wat',
+        'parenthesisWithNoArgs': '~wat()',
         'wat': 'wat',
         'pipeTest': 'a|b|c',
         'equalTest': '~equal(a|a)',
@@ -12,7 +13,11 @@ var seeThreepio = new SeeThreepio({
         'reverseTest': '~reverse(abc)',
         'reverseTestExpression': '~reverse(abc)',
         'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)',
-        'pluralizedWat(count)': '~pluralize(~wat|{count})'
+        'pluralizedWat(count)': '~pluralize(~wat|{count})',
+        'escapedTilde': '\\~',
+        'escapedParenthesis': '\\(hello\\)',
+        'escapedPipe': '\\|',
+        'escapedCurly': '\\{hello\\}'
     });
 
 test('bare words', function (t) {
@@ -27,7 +32,14 @@ test('evaluate expression (~)', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('helloWorldExpression'), 'hello wat');
 });
-test('pipes', function (t) {
+test('parenthesis call with no arguments', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('parenthesisWithNoArgs'), 'wat');
+});
+test('evaluate expression (~)', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('helloWorldExpression'), 'hello wat');
+});('pipes', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('pipeTest'), 'a,b,c');
 });
@@ -58,4 +70,22 @@ test('pluralize world', function (t) {
 test('pluralize world singular', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('pluralizedWat', [1]), 'wat');
+});
+
+
+test('Escaping: ~', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('escapedTilde'), '~');
+});
+test('Escaping: ( )', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('escapedParenthesis'), '(hello)');
+});
+test('Escaping: |', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('escapedPipe'), '|');
+});
+test('Escaping: { }', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('escapedCurly'), '{hello}');
 });
