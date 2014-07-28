@@ -13,11 +13,15 @@ var seeThreepio = new SeeThreepio({
         'reverseTest': '~reverse(abc)',
         'reverseTestExpression': '~reverse(abc)',
         'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)',
+        'pluralizedWord': '~pluralize(thing|2)',
         'pluralizedWat(count)': '~pluralize(~wat|{count})',
         'escapedTilde': '\\~',
         'escapedParenthesis': '\\(hello\\)',
         'escapedPipe': '\\|',
-        'escapedCurly': '\\{hello\\}'
+        'escapedCurly': '\\{hello\\}',
+        'escapedCurly2(thing)': '\\{{thing}\\}',
+        'escapedCurlyInvalid(thing)': '{\\{thing\\}}',
+        'watStrings': '~wat - ~pluralize(string|2).'
     });
 
 test('bare words', function (t) {
@@ -63,13 +67,21 @@ test('pluralize singular', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('pluralize', ['car', 1]), 'car');
 });
-test('pluralize world', function (t) {
+test('pluralize word', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('pluralizedWord'), 'things');
+});
+test('pluralize wat', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('pluralizedWat', [2]), 'wats');
 });
-test('pluralize world singular', function (t) {
+test('pluralize wat singular', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('pluralizedWat', [1]), 'wat');
+});
+test('watStrings', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('watStrings'), 'wat - strings.');
 });
 
 
@@ -88,4 +100,14 @@ test('Escaping: |', function (t) {
 test('Escaping: { }', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('escapedCurly'), '{hello}');
+});
+test('Escaping: { } 2', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('escapedCurly2', ['a']), '{a}');
+});
+test('Escaping: { } invalid', function (t) {
+    t.plan(1);
+    t.throws(function(){
+        seeThreepio.get('escapedCurlyInvalid', ['a']);
+    });
 });

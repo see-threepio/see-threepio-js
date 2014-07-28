@@ -150,11 +150,14 @@ PlaceholderToken = createSpec(PlaceholderToken, Token);
 PlaceholderToken.tokenPrecedence = 1;
 PlaceholderToken.prototype.parsePrecedence = 2;
 PlaceholderToken.prototype.name = 'PlaceholderToken';
-PlaceholderToken.regex = /^(\{.*?\})/;
+PlaceholderToken.regex = /^(\{.+?\})/;
 PlaceholderToken.tokenise = function(substring){
     var match = substring.match(PlaceholderToken.regex);
 
     if(match){
+        if(!match[1].match(/^\{\w+\}$/)){
+            throw "Invalid placeholder name. Placeholders may only contain word characters";
+        }
         var token = new PlaceholderToken(match[1], match[1].length);
         token.key = token.original.slice(1,-1);
         return token;
@@ -173,7 +176,7 @@ EvaluateToken = createSpec(EvaluateToken, Token);
 EvaluateToken.tokenPrecedence = 1;
 EvaluateToken.prototype.parsePrecedence = 4;
 EvaluateToken.prototype.name = 'EvaluateToken';
-EvaluateToken.regex = /^~(.*?)(?:\(.*?\))?(?:\||\)|\s|$)/;
+EvaluateToken.regex = /^~(\w+)?(?:\(|\||\)|\s|$)/;
 EvaluateToken.tokenise = function(substring){
     var match = substring.match(EvaluateToken.regex);
 
@@ -211,7 +214,7 @@ EvaluateToken.prototype.evaluate = function(scope){
 };
 
 function Term(key, expression){
-    var parts = key.match(/(.*?)(?:\((.*?)\))?(?:\||\)|\s|$)/);
+    var parts = key.match(/(\w+)(?:\((.*?)\))?(?:\||\)|\s|$)/);
 
     if(!parts){
         throw "Invalid term definition: " + key;
@@ -263,17 +266,17 @@ var SeeThreepio = function(termDefinitions){
     seeThreepio.tokenise = function(expression){
         return seeThreepio.lang.tokenise(expression, seeThreepio.tokenConverters);
     }
-    seeThreepio.get = function(term, args){
+    seeThreepio.get = function(termName, args){
         var scope = new Lang.Scope();
 
         scope.add(this.global).add(terms);
         scope.evaluateTerm = evaluateTerm;
 
-        var term = scope.get(term);
+        var term = scope.get(termName);
 
         if(!term){
             // ToDo, something nicer than throw
-            throw "term not defined";
+            throw "term not defined: " + termName;
         }
 
         return evaluateTerm(term, scope, args);

@@ -2,18 +2,14 @@ var SeeThreepio = require('./'),
     crel = require('crel'),
     swig  = require('swig');
 
-var englishTerms = {
-    'seeThreepio': 'See-Threepio',
-    'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)'
-};
+var languages;
 
-var seeThreepio = new SeeThreepio(englishTerms);
+var seeThreepio = new SeeThreepio();
 
 var termsBox = crel('textarea'),
     input = crel('textarea'),
-    output = crel('div');
-
-termsBox.value = JSON.stringify(englishTerms, null, '    ');
+    output = crel('div'),
+    languageSelect = crel('select');
 
 function updateOutput(){
     var result;
@@ -26,9 +22,10 @@ function updateOutput(){
             }}
         });
     }catch(e){
+        console.error(e);
         input.classList.add('invalid');
     }
-    
+
     if(result){
         input.classList.remove('invalid');
         output.innerHTML = result;
@@ -40,12 +37,31 @@ function updateTerms(){
     try{
         terms = JSON.parse(termsBox.value);
     }catch(e){
+        console.error(e);
         termsBox.classList.add('invalid');
     }
     if(terms){
         termsBox.classList.remove('invalid');
         seeThreepio.replaceTerms(terms);
     }
+}
+
+function updateLanguageSelect(){
+    languages = JSON.parse(document.querySelector('[type="text/json"]').textContent.trim());
+
+    for(var key in languages){
+        crel(languageSelect,
+            crel('option', {value: key}, key)
+        );
+    }
+
+    languageSelect.addEventListener('change', function(){
+        termsBox.value = JSON.stringify(languages[languageSelect.value], null, '    ');
+        updateTerms();
+        updateOutput();
+    });
+
+    termsBox.value = JSON.stringify(languages['en'], null, '    ');
 }
 
 termsBox.addEventListener('change', updateTerms);
@@ -56,13 +72,17 @@ window.addEventListener('load', function(){
     var template = document.getElementsByTagName('template')[0];
     input.value = template.innerHTML;
     template.parentElement.removeChild(template);
+
+    updateLanguageSelect();
+    updateTerms();
     updateOutput();
-    crel(document.body, 
-        crel('div', {'class':'inputArea'}, 
+    crel(document.body,
+        crel('div', {'class':'inputArea'},
             crel('h2', 'Terms'),
+            languageSelect,
             termsBox
         ),
-        crel('div', {'class':'inputArea'}, 
+        crel('div', {'class':'inputArea'},
             crel('h2', 'Input'),
             input
         ),
