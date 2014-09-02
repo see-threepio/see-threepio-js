@@ -3,6 +3,14 @@ function equal(scope, args){
     return args.next() == args.next();
 }
 
+function and(scope, args){
+    return args.next() && args.next();
+}
+
+function or(scope, args){
+    return args.next() || args.next();
+}
+
 function not(scope, args){
     return !args.next();
 }
@@ -15,11 +23,63 @@ function ifFn(scope, args){
     return args.next() ? args.get(1) : args.get(2);
 }
 
+function addition(scope, args){
+    return args.next() + args.next()
+}
+
+function subtraction(scope, args){
+    return args.next() - args.next()
+}
+
+function multiplication(scope, args){
+    return args.next() * args.next()
+}
+
+function division(scope, args){
+    return args.next() / args.next()
+}
+
+function modulus(scope, args){
+    return args.next() / args.next()
+}
+
+function lessThan(scope, args){
+    return args.next() < args.next()
+}
+
+function greaterThan(scope, args){
+    return args.next() > args.next()
+}
+
+function lessThanOrEqual(scope, args){
+    return args.next() <= args.next()
+}
+
+function greaterThanOrEqual(scope, args){
+    return args.next() >= args.next()
+}
+
 module.exports = {
-    equal: equal,
-    reverse: reverse,
+    'equal': equal,
+    '=': equal,
+    'reverse': reverse,
     'if':ifFn,
-    not: not
+    '?':ifFn,
+    'not': not,
+    '!': not,
+    'and':and,
+    '&&':and,
+    'or':or,
+    '||':or,
+    '+':addition,
+    '-':subtraction,
+    '*':multiplication,
+    '/':division,
+    '%':modulus,
+    '<':lessThan,
+    '>':greaterThan,
+    '<=':lessThanOrEqual,
+    '>=':greaterThanOrEqual
 };
 },{}],2:[function(require,module,exports){
 var Lang = require('lang-js'),
@@ -35,8 +95,12 @@ function combinedTokensResult(tokens){
     if(tokens.length === 1){
         return tokens[0].result;
     }
-    return tokens.reduce(function(result, token){
-        return result += token.result;
+    return tokens.reduce(function(result, token, index){
+        if(token.result == null){
+            return result;
+        }
+
+        return result + token.result;
     },'');
 }
 
@@ -125,6 +189,16 @@ ParenthesesOpenToken.prototype.parse = createNestingParser(ParenthesesCloseToken
 ParenthesesOpenToken.prototype.evaluate = function(scope){
     for(var i = 0; i < this.childTokens.length; i++){
         this.childTokens[i].evaluate(scope);
+    }
+
+    if(!this.isArgumentList){
+        if(this.childTokens.length === 1 && this.childTokens[0] instanceof PipeToken){
+            this.result = this.childTokens[0].result.join('|');
+        }else{
+            this.result = combinedTokensResult(this.childTokens);
+        }
+        this.result = '(' + this.result + ')';
+        return;
     }
 
     if(this.childTokens.length === 1 && this.childTokens[0] instanceof PipeToken){
@@ -218,6 +292,7 @@ EvaluateToken.tokenise = function(substring){
 EvaluateToken.prototype.parse = function(tokens, position){
     if(tokens[position+1] instanceof ParenthesesOpenToken){
         this.argsToken = tokens.splice(position+1,1).pop();
+        this.argsToken.isArgumentList = true;
     }
 };
 EvaluateToken.prototype.evaluate = function(scope){
@@ -238,7 +313,7 @@ EvaluateToken.prototype.evaluate = function(scope){
 };
 
 function Term(key, expression){
-    var parts = key.match(/(\w+)(?:\((.*?)\))?(?:\||\)|\s|$)/);
+    var parts = key.match(/([A-z0-9\-]+)(?:\((.*?)\))?(?:\||\)|\s|$)/);
 
     if(!parts){
         throw "Invalid term definition: " + key;
@@ -299,8 +374,7 @@ var SeeThreepio = function(termDefinitions){
         var term = scope.get(termName);
 
         if(!term){
-            // ToDo, something nicer than throw
-            throw "term not defined: " + termName;
+            return new Error("term not defined: " + termName);
         }
 
         return evaluateTerm(term, scope, args);
