@@ -24,7 +24,10 @@ var seeThreepio = new SeeThreepio({
         'watStrings': '~wat - ~pluralize(string|2).',
         'hyphonated-term': 'hyphonated-term',
         'ALLCAPS': 'ALLCAPS',
-        '12345': '12345'
+        '12345': '12345',
+        'braced': 'Some braced english, (like this)',
+        'bracedNPiped': 'Some braced n\' piped english, (like this | or this?)',
+        'barePipes': 'something | another thing'
     });
 
 test('bare words', function (t) {
@@ -125,4 +128,20 @@ test('identifier matching', function (t) {
     t.equal(seeThreepio.get('hyphonated-term'), 'hyphonated-term');
     t.equal(seeThreepio.get('ALLCAPS'), 'ALLCAPS');
     t.equal(seeThreepio.get('12345'), '12345');
+});
+
+test('bare braces', function (t) {
+    t.plan(2);
+    t.equal(seeThreepio.get('braced'), 'Some braced english, (like this)');
+    t.equal(seeThreepio.get('bracedNPiped'), 'Some braced n\' piped english, (like this | or this?)');
+});
+
+test('array argument value', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('hello', [['world']]), 'hello world');
+});
+
+test('bare pipes', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('barePipes'), 'something | another thing');
 });

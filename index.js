@@ -11,8 +11,12 @@ function combinedTokensResult(tokens){
     if(tokens.length === 1){
         return tokens[0].result;
     }
-    return tokens.reduce(function(result, token){
-        return result += (token.result != null) ? token.result : '';
+    return tokens.reduce(function(result, token, index){
+        if(token.result == null){
+            return result;
+        }
+
+        return result + token.result;
     },'');
 }
 
@@ -101,6 +105,16 @@ ParenthesesOpenToken.prototype.parse = createNestingParser(ParenthesesCloseToken
 ParenthesesOpenToken.prototype.evaluate = function(scope){
     for(var i = 0; i < this.childTokens.length; i++){
         this.childTokens[i].evaluate(scope);
+    }
+
+    if(!this.isArgumentList){
+        if(this.childTokens.length === 1 && this.childTokens[0] instanceof PipeToken){
+            this.result = this.childTokens[0].result.join('|');
+        }else{
+            this.result = combinedTokensResult(this.childTokens);
+        }
+        this.result = '(' + this.result + ')';
+        return;
     }
 
     if(this.childTokens.length === 1 && this.childTokens[0] instanceof PipeToken){
@@ -194,6 +208,7 @@ EvaluateToken.tokenise = function(substring){
 EvaluateToken.prototype.parse = function(tokens, position){
     if(tokens[position+1] instanceof ParenthesesOpenToken){
         this.argsToken = tokens.splice(position+1,1).pop();
+        this.argsToken.isArgumentList = true;
     }
 };
 EvaluateToken.prototype.evaluate = function(scope){
