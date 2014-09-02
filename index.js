@@ -12,7 +12,7 @@ function combinedTokensResult(tokens){
         return tokens[0].result;
     }
     return tokens.reduce(function(result, token){
-        return result += token.result;
+        return result += (token.result != null) ? token.result : '';
     },'');
 }
 

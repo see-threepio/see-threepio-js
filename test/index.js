@@ -111,3 +111,8 @@ test('Escaping: { } invalid', function (t) {
         seeThreepio.get('escapedCurlyInvalid', ['a']);
     });
 });
+
+test('null reference placeholders', function (t) {
+    t.plan(1);
+    t.equal(seeThreepio.get('hello', []), 'hello ');
+});
