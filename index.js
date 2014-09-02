@@ -214,7 +214,7 @@ EvaluateToken.prototype.evaluate = function(scope){
 };
 
 function Term(key, expression){
-    var parts = key.match(/(\w+)(?:\((.*?)\))?(?:\||\)|\s|$)/);
+    var parts = key.match(/([A-z0-9\-]+)(?:\((.*?)\))?(?:\||\)|\s|$)/);
 
     if(!parts){
         throw "Invalid term definition: " + key;

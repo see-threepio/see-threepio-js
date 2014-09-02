@@ -21,7 +21,10 @@ var seeThreepio = new SeeThreepio({
         'escapedCurly': '\\{hello\\}',
         'escapedCurly2(thing)': '\\{{thing}\\}',
         'escapedCurlyInvalid(thing)': '{\\{thing\\}}',
-        'watStrings': '~wat - ~pluralize(string|2).'
+        'watStrings': '~wat - ~pluralize(string|2).',
+        'hyphonated-term': 'hyphonated-term',
+        'ALLCAPS': 'ALLCAPS',
+        '12345': '12345'
     });
 
 test('bare words', function (t) {
@@ -115,4 +118,11 @@ test('Escaping: { } invalid', function (t) {
 test('null reference placeholders', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('hello', []), 'hello ');
+});
+
+test('identifier matching', function (t) {
+    t.plan(3);
+    t.equal(seeThreepio.get('hyphonated-term'), 'hyphonated-term');
+    t.equal(seeThreepio.get('ALLCAPS'), 'ALLCAPS');
+    t.equal(seeThreepio.get('12345'), '12345');
 });
