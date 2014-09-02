@@ -275,8 +275,7 @@ var SeeThreepio = function(termDefinitions){
         var term = scope.get(termName);
 
         if(!term){
-            // ToDo, something nicer than throw
-            throw "term not defined: " + termName;
+            return new Error("term not defined: " + termName);
         }
 
         return evaluateTerm(term, scope, args);
