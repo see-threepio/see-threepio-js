@@ -8,11 +8,11 @@ var seeThreepio = new SeeThreepio({
         'parenthesisWithNoArgs': '~wat()',
         'wat': 'wat',
         'pipeTest': 'a|b|c',
-        'equalTest': '~equal(a|a)',
-        'notEqualTest': '~not(~equal(a|a))',
+        'equalTest': '~=(a|a)',
+        'notEqualTest': '~!(~=(a|a))',
         'reverseTest': '~reverse(abc)',
         'reverseTestExpression': '~reverse(abc)',
-        'pluralize(word|count)': '~if(~equal({count}|1)|{word}|{word}s)',
+        'pluralize(word|count)': '~?(~=({count}|1)|{word}|{word}s)',
         'pluralizedWord': '~pluralize(thing|2)',
         'pluralizedWat(count)': '~pluralize(~wat|{count})',
         'escapedTilde': '\\~',
@@ -144,4 +144,52 @@ test('array argument value', function (t) {
 test('bare pipes', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('barePipes'), 'something | another thing');
+});
+
+function runSingleTerm(terms, termName, args){
+    return seeThreepio.evaluateExpression(
+        seeThreepio.convertTerms(terms),
+        termName,
+        args
+    );
+}
+
+test('functions', function (t) {
+    t.plan(4);
+    t.equal(
+        runSingleTerm({
+            'not(thing)':'~!({thing})'
+        },
+        'not',
+        [1]
+    ), 'false');
+
+
+    t.equal(
+        runSingleTerm({
+            'not(thing)':'~!({thing})'
+        },
+        'not',
+        [0]
+    ), 'true');
+
+
+    t.equal(
+        runSingleTerm({
+            'equal(a|b)':'~=({a}|{b})'
+        },
+        'equal',
+        [1,2]
+    ), 'false');
+
+
+    t.equal(
+        runSingleTerm({
+            'equal(a|b)':'~=({a}|{b})'
+        },
+        'equal',
+        [2,2]
+    ), 'true');
+
+    // Todo: more.
 });
