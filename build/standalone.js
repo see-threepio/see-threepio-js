@@ -17,8 +17,15 @@ function combinedTokensResult(tokens, finalResult){
 
 module.exports = combinedTokensResult;
 },{}],2:[function(require,module,exports){
+var Term = require('./term');
+
 function equal(scope, args){
     return args.next() == args.next();
+}
+
+function notEqual(scope, args){
+    console.log(args.all());
+    return args.next() != args.next();
 }
 
 function and(scope, args){
@@ -77,8 +84,31 @@ function greaterThanOrEqual(scope, args){
     return args.next() >= args.next()
 }
 
+function termExists(scope, args){
+    var term = scope.get(args.next());
+
+    return !!term;
+}
+
+function runTerm(scope, args){
+    var term = scope.get(args.next()),
+        allArgs = args.rest(),
+        result;
+
+    console.log(args.get(0), allArgs);
+
+    if(term instanceof Term){
+        result = scope.seeThreepio.evaluateTerm(term, scope, allArgs);
+    }else{
+        result = scope.callWith(term, allArgs);
+    }
+
+    return result;
+}
+
 module.exports = {
     '=': equal,
+    '!=': notEqual,
     'reverse': reverse,
     '?': ifFn,
     '!': not,
@@ -92,9 +122,11 @@ module.exports = {
     '<': lessThan,
     '>': greaterThan,
     '<=': lessThanOrEqual,
-    '>=': greaterThanOrEqual
+    '>=': greaterThanOrEqual,
+    '?>': termExists,
+    '->': runTerm
 };
-},{}],3:[function(require,module,exports){
+},{"./term":9}],3:[function(require,module,exports){
 var Lang = require('lang-js'),
     Token = Lang.Token,
     clone = require('clone'),
@@ -120,7 +152,7 @@ SeeThreepio.prototype.evaluateTerm = function(term, scope, args, finalResult){
 
     var tokens = this.lang.evaluate(term.expression, scope, tokenConverters, true);
 
-    return '' + combinedTokensResult(tokens, finalResult);
+    return combinedTokensResult(tokens, finalResult);
 };
 SeeThreepio.prototype.evaluateExpression = function(terms, termName, args){
     var scope = new Scope();
@@ -134,7 +166,7 @@ SeeThreepio.prototype.evaluateExpression = function(terms, termName, args){
         return new Error("term not defined: " + termName);
     }
 
-    return this.evaluateTerm(term, scope, args, true);
+    return '' + this.evaluateTerm(term, scope, args, true);
 };
 SeeThreepio.prototype.tokenise = function(expression){
     return this.lang.tokenise(expression, this.tokenConverters);
@@ -783,6 +815,18 @@ function createOpperatorTokeniser(Constructor, opperator) {
     };
 }
 
+function ArgumentToken(childTokens){
+    this.original = '';
+    this.length = 0;
+    this.childTokens = childTokens;
+}
+ArgumentToken = createSpec(ArgumentToken, Token);
+ArgumentToken.prototype.name = 'ArgumentToken';
+ArgumentToken.prototype.evaluate = function(scope){
+    evaluateTokens(this.childTokens, scope);
+    this.result = combinedTokensResult(this.childTokens);
+};
+
 function PipeToken(){}
 PipeToken = createSpec(PipeToken, Token);
 PipeToken.prototype.name = 'PipeToken';
@@ -807,9 +851,6 @@ PipeToken.prototype.parse = function(tokens, position){
     }
 };
 PipeToken.prototype.evaluate = function(scope, args) {
-    evaluateTokens(this.leftTokens, scope);
-    evaluateTokens(this.rightTokens, scope);
-
     var leftTokens = this.leftTokens,
         rightTokens = this.rightTokens;
 
@@ -819,11 +860,11 @@ PipeToken.prototype.evaluate = function(scope, args) {
     }else{
         this.result = [];
         if(leftTokens.length){
-            this.result.push(combinedTokensResult(leftTokens));
+            this.result.push(new ArgumentToken(leftTokens));
         }
     }
 
-    this.result.push(combinedTokensResult(rightTokens));
+    this.result.push(new ArgumentToken(rightTokens));
 };
 
 function ParenthesesCloseToken(){}
@@ -936,7 +977,7 @@ EvaluateToken = createSpec(EvaluateToken, Token);
 EvaluateToken.tokenPrecedence = 1;
 EvaluateToken.prototype.parsePrecedence = 4;
 EvaluateToken.prototype.name = 'EvaluateToken';
-EvaluateToken.regex = /^~(.+?)(?:\(|\||\)|\s|$)/;
+EvaluateToken.regex = /^~(.+?)(?:\(|\|(?!\()|\s|$)/;
 EvaluateToken.tokenise = function(substring){
     var match = substring.match(EvaluateToken.regex);
 
@@ -973,11 +1014,11 @@ EvaluateToken.prototype.evaluate = function(scope){
 };
 
 module.exports = [
+    EvaluateToken,
     ParenthesesCloseToken,
     ParenthesesOpenToken,
     WordToken,
     PlaceholderToken,
-    EvaluateToken,
     PipeToken
 ];
 },{"./combinedTokensResult":1,"./term":9,"lang-js":5,"lang-js/token":6,"spec-js":7}],11:[function(require,module,exports){

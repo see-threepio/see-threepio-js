@@ -6,14 +6,19 @@
     <script type="text/json">
         {
             "en":{
+                "string":"string",
                 "seeThreepio": "See-Threepio",
                 "aNewWay": "~seeThreepio is a new way to localize your ~pluralize(string|2).",
                 "ubiquetyAndPower": "It uses the ubiquety of the JSON format, and the power of a expression language to help with translation.",
                 "javascriptImplementation": "This example runs on the JavaScript implementation of ~seeThreepio(), which works both in Node, and in the browser.",
-                "minifiedAndGZipped":"Minified and gzipped, ~seeThreepio is around",
-                "fileSize(zipped|raw)":"{zipped} gzipped \\({raw} uncompressed\\)",
+                "minifiedAndGZipped": "Minified and gzipped, ~seeThreepio is around",
+                "fileSize(zipped|raw)": "{zipped} gzipped \\({raw} uncompressed\\)",
+                "pluralize(word|count)": "~||(~pluralForm({word}|{count})|{word}~?(~!=({count}|1)|s))",
+                "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|count))",
 
-                "pluralize(word|count)": "{word}~?(~=({count}|1)||s)"
+                "count(word|count)": "{count} ~pluralize(~->({word})|{count})",
+                "octopus":"octopus",
+                "*octopus(count)":"~?(~!=({count}|1)|octopie|octopus)"
             },
             "l33t":{
                 "seeThreepio": "C3PO",

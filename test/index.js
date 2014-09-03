@@ -12,7 +12,7 @@ var seeThreepio = new SeeThreepio({
         'notEqualTest': '~!(~=(a|a))',
         'reverseTest': '~reverse(abc)',
         'reverseTestExpression': '~reverse(abc)',
-        'pluralize(word|count)': '~?(~=({count}|1)|{word}|{word}s)',
+        'pluralize(word|count)': '{word}~?(~!=({count}|1)|s)',
         'pluralizedWord': '~pluralize(thing|2)',
         'pluralizedWat(count)': '~pluralize(~wat|{count})',
         'escapedTilde': '\\~',
@@ -81,7 +81,7 @@ test('pluralize wat', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('pluralizedWat', [2]), 'wats');
 });
-test('pluralize wat singular', function (t) {
+test.only('pluralize wat singular', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('pluralizedWat', [1]), 'wat');
 });
@@ -192,4 +192,21 @@ test('functions', function (t) {
     ), 'true');
 
     // Todo: more.
+});
+
+
+test('plural forms', function (t) {
+    t.plan(1);
+
+    t.equal(
+        runSingleTerm({
+            "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|word|count))",
+            "pluralize(word|count)":"~||(~pluralForm({word}|{count})|{word}~?(~!=({count}|1)|s))",
+            "*octopus(count)":"~?(~!=({count}|1)|octopie|octopus)"
+        },
+        'pluralize',
+        ['octopus', 2]
+        ),
+        'octopie'
+    )
 });

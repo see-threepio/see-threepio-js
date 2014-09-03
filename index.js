@@ -18,18 +18,23 @@ SeeThreepio.prototype.evaluateTerm = function(term, scope, args, finalResult){
     for(var i = 0; i < term.parameters.length; i++){
         var paremeter = term.parameters[i];
 
+        if(args[i] instanceof Token){
+            args[i].evaluate(scope);
+            args[i] = args[i].result;
+        }
+
         scope.set(paremeter, args[i]);
     }
 
     var tokens = this.lang.evaluate(term.expression, scope, tokenConverters, true);
 
-    return '' + combinedTokensResult(tokens, finalResult);
+    return combinedTokensResult(tokens, finalResult);
 };
 SeeThreepio.prototype.evaluateExpression = function(terms, termName, args){
     var scope = new Scope();
 
     scope.add(this.global).add(terms);
-    scope.seeThreepio = this;
+    scope.set('evaluateTerm', this.evaluateTerm.bind(this));
 
     var term = scope.get(termName);
 
@@ -37,7 +42,7 @@ SeeThreepio.prototype.evaluateExpression = function(terms, termName, args){
         return new Error("term not defined: " + termName);
     }
 
-    return this.evaluateTerm(term, scope, args, true);
+    return '' + this.evaluateTerm(term, scope, args, true);
 };
 SeeThreepio.prototype.tokenise = function(expression){
     return this.lang.tokenise(expression, this.tokenConverters);

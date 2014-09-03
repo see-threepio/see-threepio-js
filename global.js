@@ -1,5 +1,12 @@
+var Term = require('./term');
+
 function equal(scope, args){
     return args.next() == args.next();
+}
+
+function notEqual(scope, args){
+    console.log(args.all());
+    return args.next() != args.next();
 }
 
 function and(scope, args){
@@ -58,8 +65,31 @@ function greaterThanOrEqual(scope, args){
     return args.next() >= args.next()
 }
 
+function termExists(scope, args){
+    var term = scope.get(args.next());
+
+    return !!term;
+}
+
+function runTerm(scope, args){
+    var term = scope.get(args.next()),
+        allArgs = args.rest(),
+        result;
+
+    console.log(args.get(0), allArgs);
+
+    if(term instanceof Term){
+        result = scope.get('evaluateTerm')(term, scope, allArgs);
+    }else{
+        result = scope.callWith(term, allArgs);
+    }
+
+    return result;
+}
+
 module.exports = {
     '=': equal,
+    '!=': notEqual,
     'reverse': reverse,
     '?': ifFn,
     '!': not,
@@ -73,5 +103,7 @@ module.exports = {
     '<': lessThan,
     '>': greaterThan,
     '<=': lessThanOrEqual,
-    '>=': greaterThanOrEqual
+    '>=': greaterThanOrEqual,
+    '?>': termExists,
+    '->': runTerm
 };
