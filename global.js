@@ -59,24 +59,19 @@ function greaterThanOrEqual(scope, args){
 }
 
 module.exports = {
-    'equal': equal,
     '=': equal,
     'reverse': reverse,
-    'if':ifFn,
-    '?':ifFn,
-    'not': not,
+    '?': ifFn,
     '!': not,
-    'and':and,
-    '&&':and,
-    'or':or,
-    '||':or,
-    '+':addition,
-    '-':subtraction,
-    '*':multiplication,
-    '/':division,
-    '%':modulus,
-    '<':lessThan,
-    '>':greaterThan,
-    '<=':lessThanOrEqual,
-    '>=':greaterThanOrEqual
+    '&&': and,
+    '||': or,
+    '+': addition,
+    '-': subtraction,
+    '*': multiplication,
+    '/': division,
+    '%': modulus,
+    '<': lessThan,
+    '>': greaterThan,
+    '<=': lessThanOrEqual,
+    '>=': greaterThanOrEqual
 };
