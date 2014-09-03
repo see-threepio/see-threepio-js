@@ -6,6 +6,7 @@
     "test": "test"
   },
   "dependencies": {
+    "clone": "^0.1.18",
     "lang-js": "^2.0.0",
     "spec-js": "0.0.3"
   },
