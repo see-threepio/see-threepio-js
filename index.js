@@ -15,13 +15,10 @@ function SeeThreepio(termDefinitions){
     this.global = clone(global);
 };
 SeeThreepio.prototype.evaluateTerm = function(term, scope, args, finalResult){
+    scope = new Scope(scope);
+
     for(var i = 0; i < term.parameters.length; i++){
         var paremeter = term.parameters[i];
-
-        if(args[i] instanceof Token){
-            args[i].evaluate(scope);
-            args[i] = args[i].result;
-        }
 
         scope.set(paremeter, args[i]);
     }

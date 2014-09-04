@@ -7,6 +7,7 @@ var seeThreepio = new SeeThreepio({
         'helloWorldExpression': 'hello ~wat',
         'parenthesisWithNoArgs': '~wat()',
         'wat': 'wat',
+        'thing': 'thing',
         'pipeTest': 'a|b|c',
         'equalTest': '~=(a|a)',
         'notEqualTest': '~!(~=(a|a))',
@@ -15,6 +16,7 @@ var seeThreepio = new SeeThreepio({
         'pluralize(word|count)': '{word}~?(~!=({count}|1)|s)',
         'pluralizedWord': '~pluralize(thing|2)',
         'pluralizedWat(count)': '~pluralize(~wat|{count})',
+        'pluralizedThing(count)': '~pluralize(~thing|{count})',
         'escapedTilde': '\\~',
         'escapedParenthesis': '\\(hello\\)',
         'escapedPipe': '\\|',
@@ -78,12 +80,9 @@ test('pluralize word', function (t) {
     t.equal(seeThreepio.get('pluralizedWord'), 'things');
 });
 test('pluralize wat', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('pluralizedWat', [2]), 'wats');
-});
-test.only('pluralize wat singular', function (t) {
-    t.plan(1);
+    t.plan(2);
     t.equal(seeThreepio.get('pluralizedWat', [1]), 'wat');
+    t.equal(seeThreepio.get('pluralizedWat', [8]), 'wats');
 });
 test('watStrings', function (t) {
     t.plan(1);
@@ -196,11 +195,11 @@ test('functions', function (t) {
 
 
 test('plural forms', function (t) {
-    t.plan(1);
+    t.plan(2);
 
     t.equal(
         runSingleTerm({
-            "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|word|count))",
+            "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|{count}))",
             "pluralize(word|count)":"~||(~pluralForm({word}|{count})|{word}~?(~!=({count}|1)|s))",
             "*octopus(count)":"~?(~!=({count}|1)|octopie|octopus)"
         },
@@ -208,5 +207,17 @@ test('plural forms', function (t) {
         ['octopus', 2]
         ),
         'octopie'
+    )
+
+    t.equal(
+        runSingleTerm({
+            "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|{count}))",
+            "pluralize(word|count)":"~||(~pluralForm({word}|{count})|{word}~?(~!=({count}|1)|s))",
+            "*octopus(count)":"~?(~!=({count}|1)|octopie|octopus)"
+        },
+        'pluralize',
+        ['octopus', 1]
+        ),
+        'octopus'
     )
 });

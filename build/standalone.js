@@ -24,7 +24,6 @@ function equal(scope, args){
 }
 
 function notEqual(scope, args){
-    console.log(args.all());
     return args.next() != args.next();
 }
 
@@ -95,10 +94,18 @@ function runTerm(scope, args){
         allArgs = args.rest(),
         result;
 
-    console.log(args.get(0), allArgs);
+    if(term.argsToken){
+        allArgs = term.argsToken.arguments.slice();
+    }
+
+    for(var i = 0; i < allArgs.length; i++){
+        if(allArgs[i] === 'ArgumentToken'){
+            allArgs[i].functionScope = scope;
+        }
+    }
 
     if(term instanceof Term){
-        result = scope.seeThreepio.evaluateTerm(term, scope, allArgs);
+        result = scope.get('evaluateTerm')(term, scope, allArgs);
     }else{
         result = scope.callWith(term, allArgs);
     }
@@ -144,6 +151,8 @@ function SeeThreepio(termDefinitions){
     this.global = clone(global);
 };
 SeeThreepio.prototype.evaluateTerm = function(term, scope, args, finalResult){
+    scope = new Scope(scope);
+
     for(var i = 0; i < term.parameters.length; i++){
         var paremeter = term.parameters[i];
 
@@ -158,7 +167,7 @@ SeeThreepio.prototype.evaluateExpression = function(terms, termName, args){
     var scope = new Scope();
 
     scope.add(this.global).add(terms);
-    scope.seeThreepio = this;
+    scope.set('evaluateTerm', this.evaluateTerm.bind(this));
 
     var term = scope.get(termName);
 
@@ -796,7 +805,8 @@ var Token = require('lang-js/token'),
     createNestingParser = Lang.createNestingParser,
     createSpec = require('spec-js'),
     combinedTokensResult = require('./combinedTokensResult'),
-    Term = require('./term');
+    Term = require('./term'),
+    Scope = Lang.Scope;
 
 function evaluateTokens(tokens, scope){
     if(!tokens){
@@ -815,56 +825,14 @@ function createOpperatorTokeniser(Constructor, opperator) {
     };
 }
 
-function ArgumentToken(childTokens){
-    this.original = '';
-    this.length = 0;
-    this.childTokens = childTokens;
-}
-ArgumentToken = createSpec(ArgumentToken, Token);
-ArgumentToken.prototype.name = 'ArgumentToken';
-ArgumentToken.prototype.evaluate = function(scope){
-    evaluateTokens(this.childTokens, scope);
-    this.result = combinedTokensResult(this.childTokens);
-};
-
 function PipeToken(){}
 PipeToken = createSpec(PipeToken, Token);
 PipeToken.prototype.name = 'PipeToken';
 PipeToken.tokenPrecedence = 1;
 PipeToken.prototype.parsePrecedence = 5;
 PipeToken.tokenise = createOpperatorTokeniser(PipeToken, '|');
-PipeToken.prototype.parse = function(tokens, position){
-    this.leftTokens = tokens.splice(0, position);
-
-    var rightIndex = 1;
-    while(tokens[rightIndex] && !(tokens[rightIndex] instanceof PipeToken)){
-        rightIndex++;
-    }
-
-    this.rightTokens = tokens.splice(1, rightIndex - 1);
-
-    if(!this.leftTokens){
-        throw "Invalid syntax, expected token before |";
-    }
-    if(!this.rightTokens){
-        throw "Invalid syntax, expected token after |";
-    }
-};
 PipeToken.prototype.evaluate = function(scope, args) {
-    var leftTokens = this.leftTokens,
-        rightTokens = this.rightTokens;
-
-    if(leftTokens.length === 1 && leftTokens[0] instanceof PipeToken){
-        // concat
-        this.result = leftTokens[0].result.slice();
-    }else{
-        this.result = [];
-        if(leftTokens.length){
-            this.result.push(new ArgumentToken(leftTokens));
-        }
-    }
-
-    this.result.push(new ArgumentToken(rightTokens));
+    this.result = '|';
 };
 
 function ParenthesesCloseToken(){}
@@ -878,6 +846,18 @@ ParenthesesCloseToken.tokenise = function(substring) {
     }
 }
 
+function ArgumentToken(childTokens){
+    this.original = '';
+    this.length = 0;
+    this.childTokens = childTokens;
+}
+ArgumentToken = createSpec(ArgumentToken, Token);
+ArgumentToken.prototype.name = 'ArgumentToken';
+ArgumentToken.prototype.evaluate = function(scope){
+    evaluateTokens(this.childTokens, this.functionScope);
+    this.result = combinedTokensResult(this.childTokens);
+};
+
 function ParenthesesOpenToken(){}
 ParenthesesOpenToken = createSpec(ParenthesesOpenToken, Token);
 ParenthesesOpenToken.tokenPrecedence = 1;
@@ -888,26 +868,32 @@ ParenthesesOpenToken.tokenise = function(substring) {
         return new ParenthesesOpenToken(substring.charAt(0), 1);
     }
 }
-ParenthesesOpenToken.prototype.parse = createNestingParser(ParenthesesCloseToken);
-ParenthesesOpenToken.prototype.evaluate = function(scope){
+var parenthesisParser = createNestingParser(ParenthesesCloseToken);
+ParenthesesOpenToken.prototype.parse = function(tokens, index){
+    parenthesisParser.apply(this, arguments);
+
+    var arguments = [],
+        lastPipeIndex = -1;
+
     for(var i = 0; i < this.childTokens.length; i++){
-        this.childTokens[i].evaluate(scope);
+        if(this.childTokens[i] instanceof PipeToken){
+            arguments.push(new ArgumentToken(this.childTokens.slice(lastPipeIndex+1, i)));
+            lastPipeIndex = i;
+        }
     }
+
+    arguments.push(new ArgumentToken(this.childTokens.slice(lastPipeIndex+1)));
+
+    this.arguments = arguments;
+};
+ParenthesesOpenToken.prototype.evaluate = function(scope){
 
     if(!this.isArgumentList){
-        if(this.childTokens.length === 1 && this.childTokens[0] instanceof PipeToken){
-            this.result = this.childTokens[0].result.join('|');
-        }else{
-            this.result = combinedTokensResult(this.childTokens);
+        for(var i = 0; i < this.childTokens.length; i++){
+            this.childTokens[i].evaluate(scope);
         }
+        this.result = combinedTokensResult(this.childTokens);
         this.result = '(' + this.result + ')';
-        return;
-    }
-
-    if(this.childTokens.length === 1 && this.childTokens[0] instanceof PipeToken){
-        this.result = this.childTokens[0].result;
-    }else{
-        this.result = [combinedTokensResult(this.childTokens)];
     }
 }
 
@@ -969,6 +955,10 @@ PlaceholderToken.prototype.evaluate = function(scope){
     if(result instanceof Term){
         result = '';
     }
+    if(result instanceof Token){
+        result.evaluate(scope);
+        result = result.result;
+    }
     this.result = result;
 };
 
@@ -977,7 +967,7 @@ EvaluateToken = createSpec(EvaluateToken, Token);
 EvaluateToken.tokenPrecedence = 1;
 EvaluateToken.prototype.parsePrecedence = 4;
 EvaluateToken.prototype.name = 'EvaluateToken';
-EvaluateToken.regex = /^~(.+?)(?:\(|\|(?!\()|\s|$)/;
+EvaluateToken.regex = /^~(.+?)(?:\(|\|(?!\()|\)|\s|$)/;
 EvaluateToken.tokenise = function(substring){
     var match = substring.match(EvaluateToken.regex);
 
@@ -1002,12 +992,17 @@ EvaluateToken.prototype.evaluate = function(scope){
         args = [];
 
     if(this.argsToken){
-        this.argsToken.evaluate(scope);
-        args = this.argsToken.result;
+        args = this.argsToken.arguments.slice();
+    }
+
+    for(var i = 0; i < args.length; i++){
+        if(args[i].name === 'ArgumentToken'){
+            args[i].functionScope = scope;
+        }
     }
 
     if(term instanceof Term){
-        this.result = scope.seeThreepio.evaluateTerm(term, scope, args);
+        this.result = scope.get('evaluateTerm')(term, scope, args);
     }else{
         this.result = scope.callWith(term, args);
     }

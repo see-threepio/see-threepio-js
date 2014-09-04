@@ -3,6 +3,7 @@ var Token = require('lang-js/token'),
     createNestingParser = Lang.createNestingParser,
     createSpec = require('spec-js'),
     combinedTokensResult = require('./combinedTokensResult'),
+    runTerm = require('./runTerm'),
     Term = require('./term'),
     Scope = Lang.Scope;
 
@@ -52,7 +53,7 @@ function ArgumentToken(childTokens){
 ArgumentToken = createSpec(ArgumentToken, Token);
 ArgumentToken.prototype.name = 'ArgumentToken';
 ArgumentToken.prototype.evaluate = function(scope){
-    evaluateTokens(this.childTokens, scope);
+    evaluateTokens(this.childTokens, this.functionScope);
     this.result = combinedTokensResult(this.childTokens);
 };
 
@@ -165,7 +166,7 @@ EvaluateToken = createSpec(EvaluateToken, Token);
 EvaluateToken.tokenPrecedence = 1;
 EvaluateToken.prototype.parsePrecedence = 4;
 EvaluateToken.prototype.name = 'EvaluateToken';
-EvaluateToken.regex = /^~(.+?)(?:\(|\|(?!\()|\s|$)/;
+EvaluateToken.regex = /^~(.+?)(?:\(|\|(?!\()|\)|\s|$)/;
 EvaluateToken.tokenise = function(substring){
     var match = substring.match(EvaluateToken.regex);
 
@@ -185,19 +186,9 @@ EvaluateToken.prototype.parse = function(tokens, position){
     }
 };
 EvaluateToken.prototype.evaluate = function(scope){
-    var term = scope.get(this.term),
-        fn,
-        args = [];
+    var term = scope.get(this.term);
 
-    if(this.argsToken){
-        args = this.argsToken.arguments;
-    }
-
-    if(term instanceof Term){
-        this.result = scope.get('evaluateTerm')(term, scope, args);
-    }else{
-        this.result = scope.callWith(term, args);
-    }
+    this.result = runTerm(term, this.argsToken && this.argsToken.arguments, scope);
 };
 
 module.exports = [
