@@ -1,12 +1,19 @@
 var Lang = require('lang-js'),
     Token = Lang.Token,
-    clone = require('clone'),
     global = require('./global'),
     combinedTokensResult = require('./combinedTokensResult'),
     Term = require('./term'),
     tokenConverters = require('./tokens'),
     Token = Lang.Token,
     Scope = Lang.Scope;
+
+function clone(object){
+    var result = {};
+    for(var key in object){
+        result[key] = object[key];
+    }
+    return result;
+}
 
 function SeeThreepio(termDefinitions){
     this._terms = this.convertTerms(termDefinitions);
@@ -15,6 +22,8 @@ function SeeThreepio(termDefinitions){
     this.global = clone(global);
 };
 SeeThreepio.prototype.evaluateTerm = function(term, scope, args, finalResult){
+    scope = new Scope(scope);
+
     for(var i = 0; i < term.parameters.length; i++){
         var paremeter = term.parameters[i];
 
@@ -23,13 +32,13 @@ SeeThreepio.prototype.evaluateTerm = function(term, scope, args, finalResult){
 
     var tokens = this.lang.evaluate(term.expression, scope, tokenConverters, true);
 
-    return '' + combinedTokensResult(tokens, finalResult);
+    return combinedTokensResult(tokens, finalResult);
 };
 SeeThreepio.prototype.evaluateExpression = function(terms, termName, args){
     var scope = new Scope();
 
     scope.add(this.global).add(terms);
-    scope.seeThreepio = this;
+    scope.set('evaluateTerm', this.evaluateTerm.bind(this));
 
     var term = scope.get(termName);
 
@@ -37,7 +46,7 @@ SeeThreepio.prototype.evaluateExpression = function(terms, termName, args){
         return new Error("term not defined: " + termName);
     }
 
-    return this.evaluateTerm(term, scope, args, true);
+    return '' + this.evaluateTerm(term, scope, args, true);
 };
 SeeThreepio.prototype.tokenise = function(expression){
     return this.lang.tokenise(expression, this.tokenConverters);

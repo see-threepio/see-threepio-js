@@ -2,38 +2,77 @@
 <html>
 <head>
     <link rel="stylesheet" type="text/css" href="example.css">
+    <meta charset="utf-8">
     <script type="text/javascript" src="build/example.js"></script>
     <script type="text/json">
         {
             "en":{
                 "seeThreepio": "See-Threepio",
+                "string":"string",
+                "octopus":"octopus",
+                "octopie":"octopie",
+
+                "*octopus(count)":"~?(~!=({count}|1)|~octopie|~octopus)",
+
                 "aNewWay": "~seeThreepio is a new way to localize your ~pluralize(string|2).",
                 "ubiquetyAndPower": "It uses the ubiquety of the JSON format, and the power of a expression language to help with translation.",
                 "javascriptImplementation": "This example runs on the JavaScript implementation of ~seeThreepio(), which works both in Node, and in the browser.",
-                "minifiedAndGZipped":"Minified and gzipped, ~seeThreepio is around",
-                "fileSize(zipped|raw)":"{zipped} gzipped \\({raw} uncompressed\\)",
+                "minifiedAndGZipped": "Minified and gzipped, ~seeThreepio is around",
+                "fileSize(zipped|raw)": "{zipped} gzipped ({raw} uncompressed)",
+                "handlesPlurals":"Due to it's inbuilt functions, ~seeThreepio can be used to handle complex pluralization, such as ~pluralize(octopus|1) and ~pluralize(octopus|2)",
 
-                "pluralize(word|count)": "{word}~?(~=({count}|1)||s)"
+                "pluralize(word|count)": "~||(~pluralForm({word}|{count})|~->({word})~?(~!=({count}|1)|s))",
+                "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|{count}))"
+            },
+             "zh_cn":{
+                "seeThreepio": "See-Threepio",
+                "string":"文字",
+                "octopus":"八爪鱼",
+
+                "aNewWay": "~seeThreepio()旨在为程序提供本地化~pluralize(string|2).",
+                "ubiquetyAndPower": "它用广泛运用的JSON格式和强大的表达式语言来本地化和翻译.",
+                "javascriptImplementation": "这个例子是利用Javascript实现的~seeThreepio(), 以Javascript实现的~seeThreepio()可以用在Node和浏览器上.",
+                "minifiedAndGZipped": "Minified和gzipped, ~seeThreepio()都没有问题",
+                "fileSize(zipped|raw)": "{zipped} gzipped ({raw} uncompressed)",
+                "handlesPlurals":"基于它的内置功能，~seeThreepio()可用于处理复杂的名词复数（例如在英语中， ~pluralize(octopus|1) 和 ~pluralize(octopus|2)）",
+
+                "pluralize(word|count)": "~->({word})"
             },
             "l33t":{
                 "seeThreepio": "C3PO",
-                "aNewWay": "~seeThreepio iz 4 n3w w4y t0 l0c4l1z3 J00r ~pluralize(5tr1n9|2).",
+                "string":"5tr1n9",
+                "octopus":"0c70PUz",
+                "octopie":"5kw1Dz",
+
+                "*octopus(count)":"~?(~!=({count}|1)|~octopie|~octopus)",
+
+                "aNewWay": "~seeThreepio iz 4 n3w w4y t0 l0c4l1z3 J00r ~pluralize(string|2).",
                 "ubiquetyAndPower": "It u53z the ub1qu3ty 0f t3h JSON f0rm4t, & t3h p0wz 0f 4 3xpr3ss10n l4ngu4g3 to h3lp w1th tr4n5l4t10n.",
                 "javascriptImplementation": "Th15 3x4mpl3 runz 0n t3h ECMAzzz 1mpl3m3nt4t10n 0f ~seeThreepio(), wh1ch w0rks b0th 1n N0d3, & 1n t3h pr0n-f1nd3r.",
                 "minifiedAndGZipped":"M1n+gz1p'd, ~seeThreepio 1z l13k",
-                "fileSize(zipped|raw)":"{zipped} z1pd \\({raw} r4w\\)",
+                "fileSize(zipped|raw)":"{zipped} z1pd ({raw} r4w)",
+                "handlesPlurals":"Du3 70 17'z 1n6u1l7 func710n5, ~seeThreepio c4n 63 u53d to h4ndl3 c0mpl3x plur4l1z4710n, 5uch 45 ~pluralize(octopus|1) 4nd ~pluralize(octopus|2)",
 
-                "pluralize(word|count)": "{word}~?(~=({count}|1)||z)"
+                "pluralize(word|count)": "~||(~pluralForm({word}|{count})|~->({word})~?(~!=({count}|1)|z))",
+                "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|{count}))"
             },
             "dolan":{
+                "string":"ward",
+                "octopus":"dopus",
+                "octopie":"dopuses",
+
+                "*octopus(count)":"~?(~!=({count}|1)|~octopie|~octopus)",
+
                 "seeThreepio": "zeepytro plz",
-                "aNewWay": "~seeThreepio r gon locise ~pluralize(ward|2).",
+                "aNewWay": "~seeThreepio r gon locise ~pluralize(string|2).",
                 "ubiquetyAndPower": "~seeThreepio yoos JSON n got pawa frem spreshuns",
                 "javascriptImplementation": "Dis won yoos ~seeThreepio() javsreps. It r werks ebrwar",
                 "minifiedAndGZipped":"iz litdl",
-                "fileSize(zipped|raw)":"{zipped} sqweshd \\({raw} nat sqweshd\\)",
+                "fileSize(zipped|raw)":"{zipped} sqweshd ({raw} nat sqweshd)",
+                "handlesPlurals":"I liek sqweshy ~pluralize(octopus|1) an ~pluralize(octopus|2)",
 
-                "pluralize(word|count)": "{word}~?(~=({count}|1)||s)"
+                "pluralize(word|count)": "~||(~pluralForm({word}|{count})|~->({word})~?(~!=({count}|1)|s))",
+                "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|{count}))"
             }
         }
     </script>
@@ -50,9 +89,14 @@
     {{__('javascriptImplementation')}}
 </p>
 <p>
-    {{__('minifiedAndGZipped')}} <strong>{{__('fileSize', '3.48KB', '9.41KB')}}</strong>
+    {{__('minifiedAndGZipped')}} <strong>{{__('fileSize', '4.04KB', '11.61KB')}}</strong>
 </p>
-
+<p>
+    {{__('pluralize', 'octopus', 2)}}
+</p>
+<p>
+    {{__('handlesPlurals')}}
+</p>
 </template>
 </body>
 </html>
