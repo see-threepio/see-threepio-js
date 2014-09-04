@@ -1,12 +1,19 @@
 var Lang = require('lang-js'),
     Token = Lang.Token,
-    clone = require('clone'),
     global = require('./global'),
     combinedTokensResult = require('./combinedTokensResult'),
     Term = require('./term'),
     tokenConverters = require('./tokens'),
     Token = Lang.Token,
     Scope = Lang.Scope;
+
+function clone(object){
+    var result = {};
+    for(var key in object){
+        result[key] = object[key];
+    }
+    return result;
+}
 
 function SeeThreepio(termDefinitions){
     this._terms = this.convertTerms(termDefinitions);
