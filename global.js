@@ -1,5 +1,11 @@
+var runTerm = require('./runTerm');
+
 function equal(scope, args){
     return args.next() == args.next();
+}
+
+function notEqual(scope, args){
+    return args.next() != args.next();
 }
 
 function and(scope, args){
@@ -58,8 +64,28 @@ function greaterThanOrEqual(scope, args){
     return args.next() >= args.next()
 }
 
+function termExists(scope, args){
+    var term = scope.get(args.next());
+
+    return !!term;
+}
+
+function runTermFunction(scope, args){
+    var term = scope.get(args.next()),
+        args;
+
+    if(term.argsToken){
+        args = term.argsToken.arguments;
+    }else{
+        args = args.rest();
+    }
+
+    return runTerm(term, args, scope);
+}
+
 module.exports = {
     '=': equal,
+    '!=': notEqual,
     'reverse': reverse,
     '?': ifFn,
     '!': not,
@@ -73,5 +99,7 @@ module.exports = {
     '<': lessThan,
     '>': greaterThan,
     '<=': lessThanOrEqual,
-    '>=': greaterThanOrEqual
+    '>=': greaterThanOrEqual,
+    '?>': termExists,
+    '->': runTermFunction
 };
