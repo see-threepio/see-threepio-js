@@ -244,7 +244,7 @@ SeeThreepio.prototype.evaluateTerm = function(term, scope, args, finalResult){
 
         scope.set(paremeter, args[i]);
     }
-debugger;
+
     var tokens = this.lang.evaluate(term.expression, scope, tokenConverters, true);
 
     return combinedTokensResult(tokens, finalResult);
