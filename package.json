@@ -20,14 +20,15 @@
     "example-watch": "watchify example.js -o ./build/example.js",
     "watch": "watchify ./test/index.js -o ./test/index.browser.js"
   },
-  "author": "Kory Nunn <knunn187@gmail.com>",
-  "license": "ISC",
+  "author": "",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/see-threepio/see-threepio-js"
+    "url": "git+https://github.com/see-threepio/see-threepio-js.git"
   },
   "bugs": {
     "url": "https://github.com/see-threepio/see-threepio-js/issues"
   },
-  "homepage": "http://see-threepio.github.io/see-threepio-js/"
+  "homepage": "http://see-threepio.github.io/see-threepio-js/",
+  "description": "A JS implementation of See-Threepio"
 }
