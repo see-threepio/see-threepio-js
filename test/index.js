@@ -8,7 +8,6 @@ var seeThreepio = new SeeThreepio({
         'parenthesisWithNoArgs': '~wat()',
         'wat': 'wat',
         'thing': 'thing',
-        'pipeTest': 'a|b|c',
         'equalTest': '~=(a|a)',
         'notEqualTest': '~!(~=(a|a))',
         'reverseTest': '~reverse(abc)',
@@ -52,9 +51,6 @@ test('parenthesis call with no arguments', function (t) {
 test('evaluate expression (~)', function (t) {
     t.plan(1);
     t.equal(seeThreepio.get('helloWorldExpression'), 'hello wat');
-});('pipes', function (t) {
-    t.plan(1);
-    t.equal(seeThreepio.get('pipeTest'), 'a,b,c');
 });
 test('equal', function (t) {
     t.plan(1);
@@ -200,27 +196,27 @@ test('plural forms', function (t) {
 
     t.equal(
         runSingleTerm({
-            "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|{count}))",
-            "pluralize(word|count)":"~||(~pluralForm({word}|{count})|{word}~?(~!=({count}|1)|s))",
-            "*octopus(count)":"~?(~!=({count}|1)|octopie|octopus)"
+            'pluralForm(word|count)':'~?(~?>(*{word})|~->(*{word}|{count}))',
+            'pluralize(word|count)':'~||(~pluralForm({word}|{count})|{word}~?(~!=({count}|1)|s))',
+            '*octopus(count)':'~?(~!=({count}|1)|octopie|octopus)'
         },
         'pluralize',
         ['octopus', 2]
         ),
         'octopie'
-    )
+    );
 
     t.equal(
         runSingleTerm({
-            "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|{count}))",
-            "pluralize(word|count)":"~||(~pluralForm({word}|{count})|{word}~?(~!=({count}|1)|s))",
-            "*octopus(count)":"~?(~!=({count}|1)|octopie|octopus)"
+            'pluralForm(word|count)':'~?(~?>(*{word})|~->(*{word}|{count}))',
+            'pluralize(word|count)':'~||(~pluralForm({word}|{count})|{word}~?(~!=({count}|1)|s))',
+            '*octopus(count)':'~?(~!=({count}|1)|octopie|octopus)'
         },
         'pluralize',
         ['octopus', 1]
         ),
         'octopus'
-    )
+    );
 });
 
 test('plural argument', function (t) {
@@ -228,13 +224,13 @@ test('plural argument', function (t) {
 
     t.equal(
         runSingleTerm({
-            "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|{count}))",
-            "pluralize(word|count)":"~||(~pluralForm({word}|{count})|{word}~?(~!=({count}|1)|s))",
-            "plural(count)":"~pluralize(plural|{count})"
+            'pluralForm(word|count)':'~?(~?>(*{word})|~->(*{word}|{count}))',
+            'pluralize(word|count)':'~||(~pluralForm({word}|{count})|{word}~?(~!=({count}|1)|s))',
+            'plural(count)':'~pluralize(plural|{count})'
         },
         'plural',
         [2]
         ),
         'plurals'
-    )
+    );
 });
