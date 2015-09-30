@@ -18,23 +18,33 @@ install
 
 Require
 
-    var SeeThreepio = require('see-threepio');
+``` javascript
+var SeeThreepio = require('see-threepio');
+```
 
 Initialise:
 
-    var seeThreepio = new SeeThreepio([terms]);
+``` javascript
+var seeThreepio = new SeeThreepio([terms]);
+```
 
 Get strings:
 
-    seeThreepio.get(term[, array of arguments]);
+``` javascript
+seeThreepio.get(term[, array of arguments]);
+```
 
 Add terms: Adds terms to the previous set of terms
 
-    seeThreepio.addTerms(terms);
+``` javascript
+seeThreepio.addTerms(terms);
+```
 
 Replace terms: Replaces all terms with the new set
 
-    seeThreepio.addTerms(terms);
+``` javascript
+seeThreepio.addTerms(terms);
+```
 
 # Contributing
 
