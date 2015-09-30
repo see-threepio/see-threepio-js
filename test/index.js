@@ -24,6 +24,7 @@ var seeThreepio = new SeeThreepio({
         'escapedCurly2(thing)': '\\{{thing}\\}',
         'escapedCurlyInvalid(thing)': '{\\{thing\\}}',
         'watStrings': '~wat - ~pluralize(string|2).',
+        'plural(count)': '~pluralize(plural|{count})',
         'hyphonated-term': 'hyphonated-term',
         'ALLCAPS': 'ALLCAPS',
         '12345': '12345',
@@ -219,5 +220,21 @@ test('plural forms', function (t) {
         ['octopus', 1]
         ),
         'octopus'
+    )
+});
+
+test('plural argument', function (t) {
+    t.plan(1);
+
+    t.equal(
+        runSingleTerm({
+            "pluralForm(word|count)":"~?(~?>(*{word})|~->(*{word}|{count}))",
+            "pluralize(word|count)":"~||(~pluralForm({word}|{count})|{word}~?(~!=({count}|1)|s))",
+            "plural(count)":"~pluralize(plural|{count})"
+        },
+        'plural',
+        [2]
+        ),
+        'plurals'
     )
 });

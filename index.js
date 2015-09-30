@@ -52,6 +52,16 @@ SeeThreepio.prototype.tokenise = function(expression){
     return this.lang.tokenise(expression, this.tokenConverters);
 };
 SeeThreepio.prototype.get = function(termName, args){
+    if(!(termName in this._terms)){
+        return new Error("term not defined: " + termName);
+    }
+
+    var term = this._terms[termName];
+
+    if(term.isBasicTerm){
+        return term.expression;
+    }
+
     return this.evaluateExpression(this._terms, termName, args);
 };
 SeeThreepio.prototype.addTerms = function(termDefinitions){

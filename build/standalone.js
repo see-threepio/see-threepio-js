@@ -1,4 +1,96 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+// shim for using process in browser
+
+var process = module.exports = {};
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = setTimeout(cleanUpNextTick);
+    draining = true;
+
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            currentQueue[queueIndex].run();
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    clearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        setTimeout(drainQueue, 0);
+    }
+};
+
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+// TODO(shtylman)
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+},{}],2:[function(require,module,exports){
 function combinedTokensResult(tokens, finalResult){
     if(tokens.length === 1 && !finalResult){
         return tokens[0].result;
@@ -16,7 +108,7 @@ function combinedTokensResult(tokens, finalResult){
 }
 
 module.exports = combinedTokensResult;
-},{}],2:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 var runTerm = require('./runTerm');
 
 function equal(scope, args){
@@ -122,7 +214,7 @@ module.exports = {
     '?>': termExists,
     '->': runTermFunction
 };
-},{"./runTerm":7}],3:[function(require,module,exports){
+},{"./runTerm":8}],4:[function(require,module,exports){
 var Lang = require('lang-js'),
     Token = Lang.Token,
     global = require('./global'),
@@ -177,6 +269,16 @@ SeeThreepio.prototype.tokenise = function(expression){
     return this.lang.tokenise(expression, this.tokenConverters);
 };
 SeeThreepio.prototype.get = function(termName, args){
+    if(!(termName in this._terms)){
+        return new Error("term not defined: " + termName);
+    }
+
+    var term = this._terms[termName];
+
+    if(term.isBasicTerm){
+        return term.expression;
+    }
+
     return this.evaluateExpression(this._terms, termName, args);
 };
 SeeThreepio.prototype.addTerms = function(termDefinitions){
@@ -195,7 +297,7 @@ SeeThreepio.prototype.convertTerms = function(termDefinitions, terms){
 };
 
 module.exports = SeeThreepio;
-},{"./combinedTokensResult":1,"./global":2,"./term":9,"./tokens":10,"lang-js":4}],4:[function(require,module,exports){
+},{"./combinedTokensResult":2,"./global":3,"./term":10,"./tokens":11,"lang-js":5}],5:[function(require,module,exports){
 (function (process){
 var Token = require('./token');
 
@@ -596,7 +698,7 @@ Lang.Token = Token;
 
 module.exports = Lang;
 }).call(this,require('_process'))
-},{"./token":5,"_process":11}],5:[function(require,module,exports){
+},{"./token":6,"_process":1}],6:[function(require,module,exports){
 function Token(substring, length){
     this.original = substring;
     this.length = length;
@@ -608,16 +710,7 @@ Token.prototype.valueOf = function(){
 }
 
 module.exports = Token;
-},{}],6:[function(require,module,exports){
-Object.create = Object.create || function (o) {
-    if (arguments.length > 1) {
-        throw new Error('Object.create implementation only accepts the first parameter.');
-    }
-    function F() {}
-    F.prototype = o;
-    return new F();
-};
-
+},{}],7:[function(require,module,exports){
 function createSpec(child, parent){
     var parentPrototype;
 
@@ -646,7 +739,7 @@ function createSpec(child, parent){
 }
 
 module.exports = createSpec;
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 var Term = require('./term');
 
 function runTerm(term, args, scope){
@@ -666,9 +759,9 @@ function runTerm(term, args, scope){
 }
 
 module.exports = runTerm;
-},{"./term":9}],8:[function(require,module,exports){
+},{"./term":10}],9:[function(require,module,exports){
 window.SeeThreepio = require('./');
-},{"./":3}],9:[function(require,module,exports){
+},{"./":4}],10:[function(require,module,exports){
 function Term(key, expression){
     var parts = key.match(/^(.+?)(?:\((.*?)\))?(?:\||\)|\s|$)/);
 
@@ -679,10 +772,11 @@ function Term(key, expression){
     this.term = parts[1];
     this.parameters = parts[2] ? parts[2].split('|') : [];
     this.expression = expression;
+    this.isBasicTerm = !expression.match(/[~{}\\]/);
 }
 
 module.exports = Term;
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 var Token = require('lang-js/token'),
     Lang = require('lang-js'),
     createNestingParser = Lang.createNestingParser,
@@ -756,19 +850,19 @@ var parenthesisParser = createNestingParser(ParenthesesCloseToken);
 ParenthesesOpenToken.prototype.parse = function(tokens, index){
     parenthesisParser.apply(this, arguments);
 
-    var arguments = [],
+    var args = [],
         lastPipeIndex = -1;
 
     for(var i = 0; i < this.childTokens.length; i++){
         if(this.childTokens[i] instanceof PipeToken){
-            arguments.push(new ArgumentToken(this.childTokens.slice(lastPipeIndex+1, i)));
+            args.push(new ArgumentToken(this.childTokens.slice(lastPipeIndex+1, i)));
             lastPipeIndex = i;
         }
     }
 
-    arguments.push(new ArgumentToken(this.childTokens.slice(lastPipeIndex+1)));
+    args.push(new ArgumentToken(this.childTokens.slice(lastPipeIndex+1)));
 
-    this.arguments = arguments;
+    this.arguments = args;
 };
 ParenthesesOpenToken.prototype.evaluate = function(scope){
 
@@ -884,69 +978,4 @@ module.exports = [
     PlaceholderToken,
     PipeToken
 ];
-},{"./combinedTokensResult":1,"./runTerm":7,"./term":9,"lang-js":4,"lang-js/token":5,"spec-js":6}],11:[function(require,module,exports){
-// shim for using process in browser
-
-var process = module.exports = {};
-
-process.nextTick = (function () {
-    var canSetImmediate = typeof window !== 'undefined'
-    && window.setImmediate;
-    var canPost = typeof window !== 'undefined'
-    && window.postMessage && window.addEventListener
-    ;
-
-    if (canSetImmediate) {
-        return function (f) { return window.setImmediate(f) };
-    }
-
-    if (canPost) {
-        var queue = [];
-        window.addEventListener('message', function (ev) {
-            var source = ev.source;
-            if ((source === window || source === null) && ev.data === 'process-tick') {
-                ev.stopPropagation();
-                if (queue.length > 0) {
-                    var fn = queue.shift();
-                    fn();
-                }
-            }
-        }, true);
-
-        return function nextTick(fn) {
-            queue.push(fn);
-            window.postMessage('process-tick', '*');
-        };
-    }
-
-    return function nextTick(fn) {
-        setTimeout(fn, 0);
-    };
-})();
-
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
-}
-
-// TODO(shtylman)
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-
-},{}]},{},[8]);
+},{"./combinedTokensResult":2,"./runTerm":8,"./term":10,"lang-js":5,"lang-js/token":6,"spec-js":7}]},{},[9]);

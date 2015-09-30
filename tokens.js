@@ -71,19 +71,19 @@ var parenthesisParser = createNestingParser(ParenthesesCloseToken);
 ParenthesesOpenToken.prototype.parse = function(tokens, index){
     parenthesisParser.apply(this, arguments);
 
-    var arguments = [],
+    var args = [],
         lastPipeIndex = -1;
 
     for(var i = 0; i < this.childTokens.length; i++){
         if(this.childTokens[i] instanceof PipeToken){
-            arguments.push(new ArgumentToken(this.childTokens.slice(lastPipeIndex+1, i)));
+            args.push(new ArgumentToken(this.childTokens.slice(lastPipeIndex+1, i)));
             lastPipeIndex = i;
         }
     }
 
-    arguments.push(new ArgumentToken(this.childTokens.slice(lastPipeIndex+1)));
+    args.push(new ArgumentToken(this.childTokens.slice(lastPipeIndex+1)));
 
-    this.arguments = arguments;
+    this.arguments = args;
 };
 ParenthesesOpenToken.prototype.evaluate = function(scope){
 
